@@ -1,0 +1,338 @@
+@import "tailwindcss";
+
+/*
+ * Sistema visual de LocalAI Fidelity — «papel cálido».
+ *
+ * La identidad parte de dos ideas: la calidez de un comercio de barrio
+ * (papel, madera clara, luz de tarde) y la confianza de un producto cuidado
+ * (tinta profunda, violeta de marca, cifras tabulares). Todo el color vive
+ * aquí; los componentes usan las utilidades generadas.
+ */
+@theme {
+  --font-sans:
+    "InterVariable", var(--font-inter, ""), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Superficies: papel cálido, no gris de plantilla. */
+  --color-canvas: #f7f4ee;
+  --color-paper: #fbf9f5;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1ece3;
+  --color-surface-3: #e7e0d3;
+  --color-sand: #f3eee5;
+  --color-sand-strong: #e5dccb;
+
+  /* Tinta */
+  --color-ink: #1c1929;
+  --color-ink-soft: #575163;
+  --color-ink-faint: #6d6678;
+  --color-line: #e8e1d5;
+  --color-line-strong: #d7cdbd;
+
+  /* Navegación (tinta cálida) */
+  --color-nav: #211d33;
+  --color-nav-2: #2d2745;
+  --color-nav-3: #3d3560;
+
+  /* Marca y acentos */
+  --color-brand: #5b48d6;
+  --color-brand-strong: #4a37c2;
+  --color-brand-soft: #eeebfd;
+  --color-brand-glow: #8b7cf6;
+  --color-teal: #0e8a78;
+  --color-teal-soft: #ddf5f0;
+  --color-coral: #d9544a;
+  --color-coral-soft: #fdeae7;
+  --color-apricot: #c25e22;
+  --color-apricot-soft: #fdeee1;
+  --color-gold: #a56a12;
+  --color-gold-bright: #f7bd4b;
+  --color-gold-soft: #fdf2d7;
+  --color-sky: #3568cc;
+  --color-sky-soft: #e8effc;
+
+  /* Semánticos */
+  --color-ok: #0c7a55;
+  --color-ok-soft: #e0f5ea;
+  --color-warn: #8a5a00;
+  --color-warn-soft: #fdf2d7;
+  --color-danger: #b92f39;
+  --color-danger-soft: #fdeaea;
+  --color-info: #2a5fc4;
+  --color-info-soft: #e8effc;
+
+  /* Sombras cálidas: la luz de una lámpara, no un foco de oficina. */
+  --shadow-soft:
+    0 1px 2px rgb(62 47 30 / 0.05), 0 14px 34px -22px rgb(62 47 30 / 0.28);
+  --shadow-lift:
+    0 2px 5px rgb(62 47 30 / 0.07), 0 28px 56px -28px rgb(62 47 30 / 0.34);
+  --shadow-inset: inset 0 1px 0 rgb(255 255 255 / 0.65);
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-synthesis-weight: none;
+  font-feature-settings: "cv05" 1, "cv11" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/*
+ * Luz ambiental: dos halos muy suaves fijos en la página. No es decoración
+ * gratuita: separa el contenido del fondo sin meter otra tarjeta.
+ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 32rem at 8% -10%, rgb(91 72 214 / 0.06), transparent 60%),
+    radial-gradient(48rem 28rem at 100% 0%, rgb(194 94 34 / 0.05), transparent 55%);
+}
+
+/* Cifras alineadas: la firma de un panel serio. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* En la capa base para que las utilidades (p. ej. `truncate`) puedan ganar. */
+@layer base {
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+}
+
+::selection {
+  background-color: rgb(91 72 214 / 0.2);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+/* ------------------------------- texturas y superficies de marca ---------- */
+
+/* Malla cálida para bloques de marca (héroes, tarjeta). Solo CSS. */
+.mesh-brand {
+  background-color: #2a2050;
+  background-image:
+    radial-gradient(42rem 30rem at 12% 0%, rgb(139 124 246 / 0.55), transparent 62%),
+    radial-gradient(34rem 26rem at 92% 8%, rgb(53 104 204 / 0.5), transparent 60%),
+    radial-gradient(30rem 24rem at 78% 108%, rgb(194 94 34 / 0.42), transparent 62%),
+    linear-gradient(150deg, #2a2050 0%, #1f1a36 100%);
+}
+
+.mesh-ink {
+  background-color: #221d36;
+  background-image:
+    radial-gradient(38rem 26rem at 100% -10%, rgb(91 72 214 / 0.4), transparent 60%),
+    radial-gradient(26rem 20rem at 0% 110%, rgb(194 94 34 / 0.22), transparent 60%);
+}
+
+/* Papel con grano: un SVG en línea, sin peticiones externas. */
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.32'/%3E%3C/svg%3E");
+}
+
+/* Borde de ticket: muescas circulares en los laterales. */
+.ticket-notch {
+  -webkit-mask:
+    radial-gradient(circle 11px at 0 50%, transparent 98%, #000 100%),
+    radial-gradient(circle 11px at 100% 50%, transparent 98%, #000 100%);
+  -webkit-mask-composite: source-in;
+  mask:
+    radial-gradient(circle 11px at 0 50%, transparent 98%, #000 100%),
+    radial-gradient(circle 11px at 100% 50%, transparent 98%, #000 100%);
+  mask-composite: intersect;
+}
+
+/* Línea de puntos para separar secciones tipo recibo. */
+.rule-dots {
+  background-image: linear-gradient(to right, currentColor 30%, transparent 0%);
+  background-size: 9px 1px;
+  background-repeat: repeat-x;
+  height: 1px;
+  opacity: 0.28;
+}
+
+/* ------------------------------- animaciones ------------------------------ */
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -160% 0;
+  }
+  to {
+    background-position: 160% 0;
+  }
+}
+
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateY(-9px) rotate(-0.5deg);
+  }
+}
+
+@keyframes seal-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes glow-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2%, -2%, 0) scale(1.05);
+  }
+}
+
+.animate-in {
+  animation: fade-up 0.45s var(--ease-out-quint) both;
+}
+
+.animate-fade {
+  animation: fade-in 0.3s ease both;
+}
+
+.animate-pop {
+  animation: pop-in 0.28s var(--ease-spring) both;
+}
+
+.animate-float {
+  animation: float-soft 7s ease-in-out infinite;
+}
+
+.animate-seal {
+  animation: seal-pop 0.4s var(--ease-spring) both;
+}
+
+.animate-drift {
+  animation: glow-drift 14s ease-in-out infinite;
+}
+
+/* Entrada escalonada de listas (solo la primera vez). */
+.stagger > * {
+  animation: fade-up 0.4s var(--ease-out-quint) both;
+}
+.stagger > *:nth-child(2) {
+  animation-delay: 60ms;
+}
+.stagger > *:nth-child(3) {
+  animation-delay: 120ms;
+}
+.stagger > *:nth-child(4) {
+  animation-delay: 180ms;
+}
+.stagger > *:nth-child(5) {
+  animation-delay: 240ms;
+}
+.stagger > *:nth-child(6) {
+  animation-delay: 300ms;
+}
+
+/* Skeleton con destello suave. */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-2) 25%,
+    #f8f4ed 37%,
+    var(--color-surface-2) 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* Texto con degradado de marca (solo títulos grandes decorativos). */
+.text-foil {
+  background-image: linear-gradient(100deg, #ffe2b3 0%, #f7bd4b 45%, #ffe9c2 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

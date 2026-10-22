@@ -1,0 +1,8 @@
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+# Secretos jamás al contexto de build (§16.1): con NEXT_PUBLIC_ acabaría en el bundle.
+.env
+.env.*
+!.env.example

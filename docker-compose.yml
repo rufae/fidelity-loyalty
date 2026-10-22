@@ -1,0 +1,127 @@
+# LocalAI Fidelity — entorno de desarrollo (FASE 1)
+# Uso: `cp .env.example .env && docker compose up --build`
+# Puertos: web 8100 · api 8101 · postgres 5434 (ADR-0002)
+
+name: localai-fidelity
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-localai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-localai}
+      POSTGRES_DB: ${POSTGRES_DB:-localai_fidelity}
+    ports:
+      # Solo acceso del host (loopback). Para servir a clientes reales se usa
+      # el proxy de la web (WEB_PORT); un 8101 accesible en LAN permitiría
+      # falsificar `X-Forwarded-For` con respuestas de la propia API.
+      - "${DATABASE_PORT:-127.0.0.1:5434}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-localai} -d ${POSTGRES_DB:-localai_fidelity}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # Captura de correo transaccional SOLO para desarrollo y E2E (§17.2): la API
+  # apunta aquí con `EMAIL_SMTP_HOST=mailpit` (ver .env.example) y la suite
+  # Playwright lee los enlaces de verificación desde su API en 127.0.0.1:8025.
+  # En producción no se configura: la validación de arranque exige SMTP real
+  # cifrado y este contenedor no se usa (los puertos solo escuchan en loopback).
+  mailpit:
+    image: axllent/mailpit:v1.31.6
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+
+  api:
+    build: ./services/api
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-localai}:${POSTGRES_PASSWORD:-localai}@db:5432/${POSTGRES_DB:-localai_fidelity}
+      # Adaptador de Wallet (§6.6, ADR-0002): simulado por defecto, el
+      # producto completo funciona sin credenciales Apple/Google.
+      WALLET_PROVIDER: ${WALLET_PROVIDER:-simulated}
+      # Base pública para URLs absolutas en QR y etiquetas NFC (§14.1).
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      # Autenticación (§8.3, FASE 2): obligatoria siempre; en producción el
+      # arranque falla sin secreto (fail-closed). La semilla solo actúa si la
+      # tabla de usuarios está vacía: nunca sobrescribe un usuario existente.
+      AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET:-}
+      AUTH_SESSION_TTL_SECONDS: ${AUTH_SESSION_TTL_SECONDS:-604800}
+      AUTH_BOOTSTRAP_EMAIL: ${AUTH_BOOTSTRAP_EMAIL:-}
+      AUTH_BOOTSTRAP_PASSWORD: ${AUTH_BOOTSTRAP_PASSWORD:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST:-}
+      EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-587}
+      EMAIL_SMTP_USERNAME: ${EMAIL_SMTP_USERNAME:-}
+      EMAIL_SMTP_PASSWORD: ${EMAIL_SMTP_PASSWORD:-}
+      EMAIL_SMTP_STARTTLS: ${EMAIL_SMTP_STARTTLS:-true}
+      EMAIL_SMTP_SSL: ${EMAIL_SMTP_SSL:-false}
+      EMAIL_SMTP_TIMEOUT_SECONDS: ${EMAIL_SMTP_TIMEOUT_SECONDS:-10}
+      # Producción con un host privado (p. ej. tailnet) solo si se admite
+      # explícitamente (§14.1): sin esto la API no arranca.
+      ALLOW_PRIVATE_PUBLIC_BASE_URL: ${ALLOW_PRIVATE_PUBLIC_BASE_URL:-false}
+      # Trabajos Wallet (§15): reintentos con backoff y worker opt-in.
+      WALLET_JOB_MAX_ATTEMPTS: ${WALLET_JOB_MAX_ATTEMPTS:-5}
+      WALLET_JOB_BACKOFF_SECONDS: ${WALLET_JOB_BACKOFF_SECONDS:-30}
+      WALLET_WORKER_ENABLED: ${WALLET_WORKER_ENABLED:-false}
+      WALLET_WORKER_POLL_SECONDS: ${WALLET_WORKER_POLL_SECONDS:-15}
+      # Credenciales Wallet (§6.4/§6.5): vacías → proveedor `not_configured`
+      # honesto; los PEM se montan como ficheros cuando existan.
+      APPLE_PASS_TYPE_IDENTIFIER: ${APPLE_PASS_TYPE_IDENTIFIER:-}
+      APPLE_TEAM_IDENTIFIER: ${APPLE_TEAM_IDENTIFIER:-}
+      APPLE_PASS_CERT_PATH: ${APPLE_PASS_CERT_PATH:-}
+      APPLE_PASS_KEY_PATH: ${APPLE_PASS_KEY_PATH:-}
+      APPLE_PASS_CERT_PASSWORD: ${APPLE_PASS_CERT_PASSWORD:-}
+      APPLE_WWDR_CERT_PATH: ${APPLE_WWDR_CERT_PATH:-}
+      GOOGLE_WALLET_ISSUER_ID: ${GOOGLE_WALLET_ISSUER_ID:-}
+      GOOGLE_WALLET_SERVICE_ACCOUNT_JSON: ${GOOGLE_WALLET_SERVICE_ACCOUNT_JSON:-}
+    ports:
+      # Solo loopback por defecto (§16.2): la web hace de proxy (`/api/v1`);
+      # el puerto directo de la API no debe alcanzarlo otra máquina.
+      - "${API_PORT:-127.0.0.1:8101}:8101"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8101/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  web:
+    build:
+      context: ./apps/web
+      args:
+        API_URL: http://api:8101
+    restart: unless-stopped
+    environment:
+      API_URL: http://api:8101
+    ports:
+      # Solo loopback por defecto (§16.2): la web hace de proxy (`/api/v1`) y es
+      # el único servicio pensado para exponerse (con proxy TLS propio). Para
+      # pruebas desde otro dispositivo de la red local, sobrescribe WEB_PORT en
+      # `.env` de forma explícita (p. ej. `0.0.0.0:8100`).
+      - "${WEB_PORT:-127.0.0.1:8100}:8100"
+    depends_on:
+      api:
+        condition: service_healthy
+volumes:
+  pgdata:

@@ -1,0 +1,44 @@
+# Entorno: secretos y configuración local (§16.1 de localai-sales)
+.env
+.env.*
+!.env.example
+
+# Copias de seguridad locales
+backup/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Playwright (artefactos de las ejecuciones E2E)
+apps/web/test-results/
+apps/web/playwright-report/
+
+# Sistema y editores
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# Notas locales y documentación interna (no se publican)
+/design.md
+/hacerloYO.md
+/propuesta_real.md
+/status.md
+/tasks.md
+/tasks2.md
+/PROMPT_*.md
+/docs/audit/
+/docs/reference/
+/docs/PRODUCTION_GAP_ANALYSIS.md
+/docs/PRODUCTION_IMPLEMENTATION_PLAN.md
