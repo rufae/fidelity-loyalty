@@ -14,6 +14,7 @@ from app.api import (
     passkit,
     platform,
     public,
+    support,
     wallet,
 )
 
@@ -28,6 +29,8 @@ api_router.include_router(operations.router)
 api_router.include_router(wallet.router)
 api_router.include_router(nfc.router)
 api_router.include_router(dashboard.router)
+api_router.include_router(support.merchant_router)
+api_router.include_router(support.platform_router)
 api_router.include_router(passkit.router)
 
 

@@ -38,13 +38,34 @@ alta pública → `memberships` (token opaco) → `earn` idempotente →
 URL oficial guardada → verificación manual con fecha → etiqueta `/go/{slug}` →
 302 al destino + `redirect_events` (sin PII).
 
-## 4. Decisiones documentadas
+## 4. Soporte B2B
+
+Flujo privado entre el comercio y la plataforma (Plan.md):
+
+```text
+Comercio crea conversación → support_threads + support_messages
+        ↓ misma transacción
+support_notifications (outbox: email/ntfy/Telegram)
+        ↓ worker con reintentos
+Buzón de plataforma → respuesta → aviso al comercio
+```
+
+- **Solo usuarios autenticados** de comercio (`owner`, `admin`, `staff`); `staff`
+  solo ve sus hilos. La plataforma ve todos.
+- El teléfono de una solicitud de llamada se guarda **cifrado**
+  (`app/core/crypto.py`) y solo se descifra en el buzón de plataforma.
+- El outbox `support_notifications` usa `UPDATE` condicional al reclamar cada
+  aviso: funciona con varios nodos sin duplicar envíos.
+- Los avisos externos son opcionales; el buzón interno es la fuente de verdad.
+- No hay telefonía integrada: la llamada se acuerda fuera de la aplicación.
+
+## 5. Decisiones documentadas
 
 - `docs/ADR/0001-stack-y-estructura.md`
 - `docs/ADR/0002-entornos-puertos-y-wallet-simulado.md`
 - `docs/ADR/0003-identidad-y-autenticación.md`
 
-## 5. Pendientes explícitos
+## 6. Pendientes explícitos
 
 - Worker en segundo plano real (hoy el trabajo Wallet se ejecuta de forma
   síncrona-simple con estado persistido; el modelo ya lo soporta).

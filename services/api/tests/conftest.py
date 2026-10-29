@@ -32,6 +32,7 @@ STAFF_EMAIL = "staff-a@example.com"
 PLATFORM_EMAIL = "admin@plataforma.example.com"
 PASSWORD = "contrasena-larga-1234"
 EMAIL_OUTBOX: list[dict[str, str]] = []
+NOTIFY_OUTBOX: list[dict[str, str]] = []
 
 
 @pytest.fixture()
@@ -58,9 +59,11 @@ def client(db_session: Session, monkeypatch: pytest.MonkeyPatch) -> Iterator[Tes
         public_limiter,
         public_read_limiter,
     )
+    from app.integrations import notify as notify_service
     from app.services import email as email_service
 
     EMAIL_OUTBOX.clear()
+    NOTIFY_OUTBOX.clear()
 
     def capture_email(
         settings: Settings,
@@ -75,8 +78,30 @@ def client(db_session: Session, monkeypatch: pytest.MonkeyPatch) -> Iterator[Tes
             {"recipient": recipient, "subject": subject, "text": text, "action_url": action_url}
         )
 
+    def capture_support_email(
+        settings: Settings,
+        recipient: str,
+        subject: str,
+        text: str,
+        action_url: str,
+    ) -> None:
+        EMAIL_OUTBOX.append(
+            {"recipient": recipient, "subject": subject, "text": text, "action_url": action_url}
+        )
+
+    def capture_ntfy(settings: Settings, title: str, message: str, click_url: str) -> None:
+        NOTIFY_OUTBOX.append(
+            {"channel": "ntfy", "title": title, "message": message, "click_url": click_url}
+        )
+
+    def capture_telegram(settings: Settings, text: str) -> None:
+        NOTIFY_OUTBOX.append({"channel": "telegram", "text": text})
+
     monkeypatch.setattr(email_service, "ensure_email_configured", lambda settings: None)
     monkeypatch.setattr(email_service, "send_email", capture_email)
+    monkeypatch.setattr(email_service, "send_support_email", capture_support_email)
+    monkeypatch.setattr(notify_service, "send_ntfy", capture_ntfy)
+    monkeypatch.setattr(notify_service, "send_telegram", capture_telegram)
 
     app.dependency_overrides[get_session] = override_get_session
     reset_rate_limiter()

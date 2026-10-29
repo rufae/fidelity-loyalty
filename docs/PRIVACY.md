@@ -66,3 +66,22 @@ de derechos (pendiente explícita).
 La plataforma **no** trata datos de reseñas ni intenta saber quién publicó
 qué: solo facilita el acceso al enlace oficial y cuenta clics. Ese tratamiento
 es anónimo por diseño.
+
+## 8. Soporte B2B
+
+- **Quién**: solo usuarios autenticados de los comercios que contratan la
+  plataforma; los clientes finales no usan este canal.
+- **Datos del mensaje**: el contenido puede contener datos personales que el
+  comercio decida incluir. Se usa para atender la solicitud y se conserva
+  mientras la conversación esté abierta y durante el plazo de retención.
+- **Teléfono de llamada**: opcional y con consentimiento separado. Se guarda
+  cifrado (`SUPPORT_PHONE_ENCRYPTION_KEY`), solo lo descifra la administración
+  de plataforma y **no** se incluye en emails, push, logs ni listados.
+- **Avisos**: email/ntfy/Telegram pueden contener comercio, asunto, un extracto
+  corto del mensaje y un enlace. Nunca el teléfono ni el mensaje completo si
+  no es necesario.
+- **Retención**: conversaciones cerradas 12 meses; solicitudes de llamada 30
+  días después de atenderse o cancelarse; registros de aviso 30 días. Estos
+  plazos son la política inicial y se revisarán antes de producción.
+- **Derechos**: el comercio puede solicitar acceso, rectificación o supresión
+  de sus conversaciones; el ledger de movimientos del programa no se toca.

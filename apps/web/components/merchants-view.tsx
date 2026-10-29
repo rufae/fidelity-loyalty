@@ -15,6 +15,7 @@ import {
   IconClose,
   IconEye,
   IconEyeOff,
+  IconMail,
   IconPlus,
   Input,
   LinkButton,
@@ -144,19 +145,24 @@ export function MerchantsView() {
           }
           actions={
             admin ? (
-              creating ? (
-                <Button
-                  variant="secondary"
-                  icon={<IconClose size={17} />}
-                  onClick={() => setCreating(false)}
-                >
-                  Cerrar
-                </Button>
-              ) : (
-                <Button icon={<IconPlus size={17} />} onClick={() => setCreating(true)}>
-                  Nuevo comercio
-                </Button>
-              )
+              <div className="flex flex-wrap items-center gap-2">
+                <LinkButton href="/platform/support" variant="secondary" icon={<IconMail size={17} />}>
+                  Soporte
+                </LinkButton>
+                {creating ? (
+                  <Button
+                    variant="secondary"
+                    icon={<IconClose size={17} />}
+                    onClick={() => setCreating(false)}
+                  >
+                    Cerrar
+                  </Button>
+                ) : (
+                  <Button icon={<IconPlus size={17} />} onClick={() => setCreating(true)}>
+                    Nuevo comercio
+                  </Button>
+                )}
+              </div>
             ) : undefined
           }
         />

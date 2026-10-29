@@ -102,6 +102,38 @@ GET /api/v1/merchants/{id}/dashboard/loyalty?period=7|30|90
 GET /api/v1/merchants/{id}/export/members.csv
 ```
 
+## Soporte B2B (privado, Plan.md §9)
+
+```text
+# Comercio (owner/admin/staff; staff solo sus hilos)
+GET    /api/v1/merchants/{id}/support
+POST   /api/v1/merchants/{id}/support                          Idempotency-Key opcional
+GET    /api/v1/merchants/{id}/support/unread-count
+GET    /api/v1/merchants/{id}/support/{thread_id}
+POST   /api/v1/merchants/{id}/support/{thread_id}/messages      Idempotency-Key opcional
+POST   /api/v1/merchants/{id}/support/{thread_id}/callback-requests
+POST   /api/v1/merchants/{id}/support/{thread_id}/close
+POST   /api/v1/merchants/{id}/support/{thread_id}/read
+
+# Plataforma (solo platform_owner/platform_admin)
+GET    /api/v1/platform/support/threads
+GET    /api/v1/platform/support/threads/{thread_id}
+POST   /api/v1/platform/support/threads/{thread_id}/messages
+PATCH  /api/v1/platform/support/threads/{thread_id}
+POST   /api/v1/platform/support/threads/{thread_id}/callback-requests/{request_id}/mark-called
+POST   /api/v1/platform/support/threads/{thread_id}/read
+GET    /api/v1/platform/support/unread-count
+POST   /api/v1/platform/support/notifications/{notification_id}/retry
+```
+
+- `staff` solo ve las conversaciones que ha creado; `viewer` no accede.
+- El teléfono de llamada solo se devuelve en el detalle de plataforma; el
+  comercio solo ve el estado de su solicitud.
+- `Idempotency-Key` evita duplicar conversaciones, mensajes y solicitudes.
+- Límites por día: conversaciones, mensajes y solicitudes de llamada (`429`).
+- Los avisos externos (email/ntfy/Telegram) se registran en un outbox y se
+  reintentan; nunca bloquean la conversación.
+
 ## Códigos de error de dominio
 
 `invalid_credentials`, `login_rate_limited`, `program_not_active`,
@@ -109,7 +141,9 @@ GET /api/v1/merchants/{id}/export/members.csv
 `membership_not_found`, `membership_inactive`, `insufficient_stamps`,
 `reward_not_available`, `duplicate_operation`, `wallet_provider_not_configured`,
 `tag_disabled`, `tag_not_found`, `review_destination_not_verified`,
-`invalid_review_url`, `review_destination_required`, `not_found`.
+`invalid_review_url`, `review_destination_required`, `not_found`,
+`support_rate_limited`, `support_thread_closed`, `support_thread_not_found`,
+`notification_delivery_failed`, `notification_not_configured`.
 
 > Un recurso ajeno responde **igual** que uno inexistente (`404 not_found`),
 > para no permitir enumeración (§8.2).

@@ -98,6 +98,13 @@ def _start_wallet_worker() -> None:
     start_wallet_worker(get_settings())
 
 
+def _start_support_worker() -> None:
+    """Arranca el worker de avisos de soporte si está habilitado (Plan.md §11)."""
+    from app.workers.support_runner import start_support_worker
+
+    start_support_worker(get_settings())
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
@@ -115,7 +122,7 @@ def create_app() -> FastAPI:
         openapi_url=f"{settings.api_prefix}/openapi.json" if expose_docs else None,
         docs_url="/docs" if expose_docs else None,
         redoc_url="/redoc" if expose_docs else None,
-        on_startup=[_bootstrap_users, _start_wallet_worker],
+        on_startup=[_bootstrap_users, _start_wallet_worker, _start_support_worker],
     )
 
     @application.middleware("http")

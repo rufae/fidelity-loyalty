@@ -11,6 +11,7 @@ import {
   IconContactless,
   IconGrid,
   IconGift,
+  IconMail,
   IconMenu,
   IconScan,
   IconStar,
@@ -62,6 +63,10 @@ const MANAGER_GROUPS = [
       { href: "/reviews", label: "Reseñas Google", icon: IconStar },
     ],
   },
+  {
+    label: "Ayuda",
+    items: [{ href: "/support", label: "Soporte", icon: IconMail }],
+  },
 ] as const;
 
 /** El personal de mostrador solo opera tarjetas: ni configuración ni clientes. */
@@ -69,6 +74,10 @@ const STAFF_GROUPS = [
   {
     label: "Tu puesto",
     items: [{ href: "/operations", label: "Operaciones", icon: IconScan }],
+  },
+  {
+    label: "Ayuda",
+    items: [{ href: "/support", label: "Soporte", icon: IconMail }],
   },
 ] as const;
 

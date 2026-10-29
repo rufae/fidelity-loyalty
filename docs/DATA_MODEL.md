@@ -1,7 +1,7 @@
 # Modelo de datos — LocalAI Fidelity
 
-> Esquema real a 12/10/2026: **16 tablas** + `alembic_version`, con 7
-> migraciones versionadas (`0001_baseline` … `0007_nfc`).
+> Esquema real a 28/10/2026: **23 tablas** + `alembic_version`, con 11
+> migraciones versionadas (`0001_baseline` … `0011_support`).
 
 ## Entidades
 
@@ -23,6 +23,10 @@
 | `nfc_tags` | Etiquetas lógicas | `tag_type` distingue alta vs reseñas; slug aleatorio |
 | `review_destinations` | Destino oficial verificado | 1 por comercio; cambiar URL pierde verificación |
 | `redirect_events` | Métrica de clics | Sin IP, sin user-agent, sin PII |
+| `support_threads` | Conversación de soporte del comercio | `idempotency_key` única por comercio |
+| `support_messages` | Mensajes del hilo | Texto plano; lecturas separadas comercio/plataforma |
+| `support_callback_requests` | Solicitud de llamada | `phone_encrypted`; nunca se expone al comercio |
+| `support_notifications` | Outbox de avisos | email/ntfy/Telegram con reintentos; `idempotency_key` única |
 
 ## Reglas de integridad
 
@@ -31,6 +35,14 @@
 - `loyalty_transactions.idempotency_key` UNIQUE → una operación repetida no
   puede aplicarse dos veces (§16.4).
 - `memberships` UNIQUE (miembro, programa) → sin dobles altas.
+- `support_threads.idempotency_key` UNIQUE por comercio → reintentar la misma
+  petición no duplica conversaciones.
+- `support_messages.idempotency_key` UNIQUE por hilo → un mensaje repetido no
+  se guarda dos veces.
+- `support_notifications.idempotency_key` UNIQUE → un aviso se envía una sola
+  vez por mensaje y canal.
+- El teléfono de `support_callback_requests` se guarda **cifrado** en la
+  aplicación; no existe como texto plano en el modelo.
 - No existen claves foráneas hacia recompensas desde `nfc_tags`: la
   vinculación recompensa↔reseña **no es modelable** (§4.2).
 

@@ -7,6 +7,12 @@ from app.models.loyalty import LoyaltyProgram, ProgramReward
 from app.models.members import Member, Membership
 from app.models.merchant import Merchant
 from app.models.nfc import NfcTag, RedirectEvent, ReviewDestination
+from app.models.support import (
+    SupportCallbackRequest,
+    SupportMessage,
+    SupportNotification,
+    SupportThread,
+)
 from app.models.user import MerchantUser, User, UserSession
 from app.models.wallet import BackgroundJob, WalletPass
 
@@ -24,6 +30,10 @@ __all__ = [
     "NfcTag",
     "RedirectEvent",
     "ReviewDestination",
+    "SupportCallbackRequest",
+    "SupportMessage",
+    "SupportNotification",
+    "SupportThread",
     "MerchantUser",
     "ProgramReward",
     "User",

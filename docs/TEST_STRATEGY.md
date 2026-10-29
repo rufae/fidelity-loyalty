@@ -41,6 +41,11 @@ Gates obligatorios antes de dar por terminada cualquier tarea:
 - **NFC/Reseñas** (`test_nfc_reviews.py`): redirect verificado, sin *open
   redirect*, sin filtro de satisfacción, esquema sin campos de incentivo,
   métrica `review_link_clicks`, etiqueta desactivada con 410.
+- **Soporte B2B** (`test_support.py`): creación de conversaciones con idempotencia,
+  límites antiabuso, aislamiento entre comercios, `staff` solo ve sus hilos,
+  `viewer` sin acceso, teléfono cifrado y visible solo para plataforma,
+  outbox con reintentos y reintento manual, avisos email/ntfy/Telegram y
+  configuración de canales.
 - **E2E** (`test_e2e_flow.py`): recorrido completo §19.3 con auditoría final.
 
 ## 3. Qué cubre el frontend

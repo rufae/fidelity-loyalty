@@ -80,10 +80,10 @@ modo de demostración.
 
 | Rol | Pantallas |
 |---|---|
-| Administración de plataforma | Lista de comercios, panel completo de cualquier comercio y `/estado` (diagnóstico) |
-| Propietario / administrador del comercio | Panel completo: Resumen, Programas, Operaciones, Clientes, NFC y QR, Reseñas |
-| Personal de mostrador | Solo **Operaciones** (acumular y canjear); la URL directa a otras secciones no las muestra |
-| Solo lectura | Ficha del comercio y un aviso de alcance; sin secciones operativas |
+| Administración de plataforma | Lista de comercios, **buzón de soporte**, panel completo de cualquier comercio y `/estado` (diagnóstico) |
+| Propietario / administrador del comercio | Panel completo: Resumen, Programas, Operaciones, Clientes, NFC y QR, Reseñas y Soporte |
+| Personal de mostrador | **Operaciones** (acumular y canjear) y su propio **Soporte**; la URL directa a otras secciones no las muestra |
+| Solo lectura | Ficha del comercio y un aviso de alcance; sin secciones operativas ni soporte |
 | Cliente final | Páginas públicas: alta (`/p/…`), tarjeta (`/card/…`), recuperación (`/my-card/…`) y el enlace de reseñas. **Nunca** el panel |
 
 La portada `/` es pública y separa los dos recorridos (comercios → acceso;
@@ -97,6 +97,10 @@ La interfaz oculta y redirige, pero **la API es el control definitivo**
 11. Un administrador de plataforma crea comercios y sus propietarios, y
     supervisa cualquier panel. **Un comercio jamás ve datos de otro** (las
     pruebas lo comprueban de forma negativa A↔B).
+12. En **Soporte**, cada comercio abre conversaciones privadas con la
+    plataforma; el propietario responde desde el buzón y recibe avisos por
+    email/ntfy/Telegram. Si el comercio pide llamada, deja un teléfono cifrado
+    que solo ve la plataforma; la llamada se hace fuera de la aplicación.
 
 ### Ecosistema
 
@@ -122,6 +126,7 @@ al negocio y Fidelity lo opera. Nunca comparten base de datos.
 | Reseñas de Google | ✅ | Neutral, verificado, métrica = visitas al enlace |
 | Analítica y exportación CSV | ✅ | Cifras reales, sin tokens en la exportación |
 | Trabajos Wallet resilientes | ✅ | Reintentos con backoff, dead-letter, worker opt-in e reintento manual |
+| Soporte B2B | ✅ | Conversaciones privadas del comercio con la plataforma, teléfono cifrado y avisos email/ntfy/Telegram |
 | Generadores Apple/Google | 🟡 | `.pkpass` firmado y JWT «Save to Google Wallet» implementados y probados con credenciales de prueba; **faltan credenciales reales y validación en dispositivo** |
 | Integración con LocalAI Sales | 🟡 | Por API con usuario de plataforma; simulado por defecto (ADR-0007) |
 | Modo «puntos» | ⛔ | Solo sellos en el piloto (decisión documentada) |
@@ -199,6 +204,10 @@ Ver [`.env.example`](./.env.example). Los secretos van siempre en `.env`
 | `PUBLIC_BASE_URL` | ver `.env.example` | origen absoluto de los QR y las etiquetas NFC; obligatoria y `https://` en producción |
 | `EMAIL_FROM` / `EMAIL_SMTP_HOST` | `mailpit` en desarrollo | SMTP transaccional: verificación de altas y recuperación de tarjetas. En producción es obligatorio **y exige TLS** (`EMAIL_SMTP_STARTTLS` o `EMAIL_SMTP_SSL`); sin SMTP la API no arranca (fail-closed) |
 | `EMAIL_SMTP_PORT` | `1025` (Mailpit) / `587` real | En desarrollo el correo se captura en `http://localhost:8025` (contenedor `mailpit`) |
+| `SUPPORT_NOTIFICATION_EMAIL` / `SUPPORT_FROM_EMAIL` | vacío | Correo privado del propietario y remitente genérico del soporte B2B |
+| `SUPPORT_NTFY_*` / `SUPPORT_TELEGRAM_*` | desactivados | Canales de aviso opcionales; ntfy puede autoalojarse y Telegram usa un bot gratuito |
+| `SUPPORT_PHONE_ENCRYPTION_KEY` | vacío | Clave para cifrar el teléfono de las solicitudes de llamada; sin ella no se guardan teléfonos |
+| `SUPPORT_WORKER_ENABLED` | `false` | Worker del outbox de avisos de soporte |
 | `WEB_PORT` / `API_PORT` / `DATABASE_PORT` | `127.0.0.1:8100` / `127.0.0.1:8101` / `127.0.0.1:5434` | **solo loopback por defecto** (§16.2); para probar desde el móvil en la red local hay que sobrescribir `WEB_PORT` en `.env` de forma explícita |
 
 ---
@@ -207,10 +216,10 @@ Ver [`.env.example`](./.env.example). Los secretos van siempre en `.env`
 
 | Suite | Comando | Cubre |
 |---|---|---|
-| Backend (pytest) | `cd services/api && uv run pytest` | 179 pruebas: dominio, aislamiento, matriz de roles, ledger, ciclo de vida, Wallet, trabajos, `.pkpass`, JWT de Google, correo/SMTP, límites públicos y regresiones de la auditoría |
+| Backend (pytest) | `cd services/api && uv run pytest` | 201 pruebas: dominio, aislamiento, matriz de roles, ledger, ciclo de vida, Wallet, trabajos, `.pkpass`, JWT de Google, correo/SMTP, soporte B2B, límites públicos y regresiones de la auditoría |
 | Concurrencia real (PostgreSQL) | `uv run pytest -m pg` | doble canje simultáneo, idempotencia por restricción de BD, revocación en carrera y canje concurrente de enlaces de un solo uso. Usa `PG_TEST_URL` o el `DATABASE_URL` del `.env` |
-| Frontend (vitest) | `cd apps/web && npm test` | 32 pruebas de utilidades y regresiones |
-| E2E de navegador (Playwright) | `cd apps/web && npm run e2e` | 5 flujos: etiqueta NFC → alta → tarjeta → sello → canje → suspensión; escáner; etiqueta de mostrador; actualización de la tarjeta sin recargar (requiere la pila levantada) |
+| Frontend (vitest) | `cd apps/web && npm test` | 40 pruebas de utilidades y regresiones |
+| E2E de navegador (Playwright) | `cd apps/web && npm run e2e` | 14 pruebas: etiqueta NFC → alta → tarjeta → sello → canje → suspensión; escáner; etiqueta de mostrador; actualización de la tarjeta sin recargar; roles; y soporte B2B (conversación, respuesta y llamada privada). Requiere la pila levantada |
 
 Gates de calidad:
 

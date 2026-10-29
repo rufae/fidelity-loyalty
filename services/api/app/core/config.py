@@ -79,6 +79,32 @@ class Settings(BaseSettings):
     email_smtp_ssl: bool = False
     email_smtp_timeout_seconds: int = 10
 
+    # Soporte B2B (Plan.md §11): buzón interno + avisos por email/ntfy/Telegram.
+    # Todas las capas externas son opt-in y, si fallan, la conversación sigue
+    # viva en el panel: los avisos nunca son la fuente de verdad.
+    support_email_enabled: bool = True
+    #: Correo privado del propietario de la plataforma. Nunca se muestra al comercio.
+    support_notification_email: str | None = None
+    #: Remitente genérico del soporte; si falta se usa EMAIL_FROM.
+    support_from_email: str | None = None
+    support_ntfy_enabled: bool = False
+    support_ntfy_base_url: str | None = None
+    support_ntfy_topic: str | None = None
+    support_ntfy_token: str | None = None
+    support_telegram_enabled: bool = False
+    support_telegram_bot_token: str | None = None
+    support_telegram_chat_id: str | None = None
+    support_worker_enabled: bool = False
+    support_worker_poll_seconds: int = 15
+    support_notification_max_attempts: int = 5
+    support_notification_backoff_seconds: int = 30
+    #: Clave para cifrar teléfonos de solicitud de llamada (§12.2 de Plan.md).
+    support_phone_encryption_key: str | None = None
+    support_thread_rate_limit_per_day: int = 5
+    support_message_rate_limit_per_day: int = 20
+    support_callback_rate_limit_per_day: int = 3
+    support_message_max_length: int = 4000
+
     # Adaptador de Wallet (§6.6, ADR-0002). Por defecto SIMULADO: el producto
     # completo funciona sin credenciales Apple/Google y la UI lo rotula como
     # tal para no confundirlo con una tarjeta emitida de verdad (§17.2).
@@ -204,6 +230,32 @@ class Settings(BaseSettings):
             ]
             if faltan:
                 raise ValueError("WALLET_PROVIDER=google requiere: " + ", ".join(faltan))
+        return self
+
+    @model_validator(mode="after")
+    def _support_channels_config(self) -> "Settings":
+        """Un canal de aviso no se «activa» a medias: exige sus variables (§17.4).
+
+        Si un canal está habilitado pero incompleto, falla al arrancar y se
+        informa de **qué variable falta**, nunca de su valor (§16.1).
+        """
+        if self.support_ntfy_enabled and not (
+            self.support_ntfy_base_url and self.support_ntfy_topic
+        ):
+            raise ValueError(
+                "SUPPORT_NTFY_ENABLED=true requiere SUPPORT_NTFY_BASE_URL y SUPPORT_NTFY_TOPIC"
+            )
+        if self.support_telegram_enabled and not (
+            self.support_telegram_bot_token and self.support_telegram_chat_id
+        ):
+            raise ValueError(
+                "SUPPORT_TELEGRAM_ENABLED=true requiere SUPPORT_TELEGRAM_BOT_TOKEN y "
+                "SUPPORT_TELEGRAM_CHAT_ID"
+            )
+        if self.support_worker_poll_seconds < 1:
+            raise ValueError("SUPPORT_WORKER_POLL_SECONDS debe ser al menos 1.")
+        if self.support_notification_max_attempts < 1:
+            raise ValueError("SUPPORT_NOTIFICATION_MAX_ATTEMPTS debe ser al menos 1.")
         return self
 
     @model_validator(mode="after")

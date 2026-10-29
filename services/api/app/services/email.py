@@ -44,7 +44,12 @@ def ensure_email_configured(settings: Settings) -> None:
 
 
 def _render_html(
-    merchant_name: str, subject: str, text: str, action_url: str, cta_label: str
+    merchant_name: str,
+    subject: str,
+    text: str,
+    action_url: str,
+    cta_label: str,
+    subtitle: str = "Tu programa de fidelización",
 ) -> str:
     """HTML de un solo bloque, sin recursos externos (los clientes lo bloquean)."""
     url = escape(action_url, quote=True)
@@ -53,6 +58,7 @@ def _render_html(
     text_h = escape(text)
     cta_h = escape(cta_label)
     merchant_h = escape(merchant_name) if merchant_name else escape(_PLATFORM)
+    subtitle_h = escape(subtitle)
     preheader = escape(f"{subject} · {text[:90]}")
     font = _FONT  # atajo para no repetir la pila en cada regla
 
@@ -80,7 +86,7 @@ def _render_html(
   <tr>
     <td style="background-color:{_NAVY};padding:20px 32px;">
       <span style="font-family:{font};font-size:18px;font-weight:700;color:#ffffff;letter-spacing:0.01em;">{merchant_h}</span>
-      <span style="display:block;margin-top:2px;font-family:{font};font-size:12px;font-weight:500;color:#b3acff;">Tu programa de fidelización</span>
+      <span style="display:block;margin-top:2px;font-family:{font};font-size:12px;font-weight:500;color:#b3acff;">{subtitle_h}</span>
     </td>
   </tr>
   <tr>
@@ -125,40 +131,16 @@ def _render_text(merchant_name: str, subject: str, text: str, action_url: str) -
     )
 
 
-def send_email(
-    settings: Settings,
-    recipient: str,
-    subject: str,
-    text: str,
-    action_url: str,
-    cta_label: str = "Abrir mi tarjeta",
-    merchant_name: str = "",
-) -> None:
-    """Envía correo por SMTP con TLS verificado; falla explícitamente si no corresponde.
-
-    El mensaje va en nombre del comercio (`merchant_name` en cabecera y en el
-    «De» visible); la plataforma firma el pie. La dirección `From` no cambia:
-    sigue siendo la configurada, que es la que autentican SPF/DKIM/DMARC.
-    """
+def _deliver_message(settings: Settings, message: EmailMessage) -> None:
+    """Entrega un mensaje ya construido por SMTP con TLS verificado."""
     ensure_email_configured(settings)
     assert settings.email_from is not None and settings.email_smtp_host is not None
 
-    # Fail-closed: jamás claves ni enlaces en claro en producción, aunque
+    # Fail-closed: jamás credenciales ni mensajes en claro en producción, aunque
     # `EMAIL_SMTP_STARTTLS=false` hubiera colado en la configuración.
     if settings.is_production and not (settings.email_smtp_ssl or settings.email_smtp_starttls):
         raise DomainError(503, "email_delivery_not_configured", _TLS_MSG)
 
-    message = EmailMessage()
-    message["Subject"] = subject
-    message["From"] = (
-        formataddr((merchant_name, settings.email_from)) if merchant_name else settings.email_from
-    )
-    message["To"] = recipient
-    message.set_content(_render_text(merchant_name, subject, text, action_url))
-    message.add_alternative(
-        _render_html(merchant_name, subject, text, action_url, cta_label),
-        subtype="html",
-    )
     try:
         if settings.email_smtp_ssl:
             with smtplib.SMTP_SSL(
@@ -185,6 +167,80 @@ def send_email(
             "email_delivery_failed",
             "No se pudo enviar el correo ahora. Inténtalo de nuevo más tarde.",
         ) from exc
+
+
+def send_email(
+    settings: Settings,
+    recipient: str,
+    subject: str,
+    text: str,
+    action_url: str,
+    cta_label: str = "Abrir mi tarjeta",
+    merchant_name: str = "",
+) -> None:
+    """Envía correo por SMTP con TLS verificado; falla explícitamente si no corresponde.
+
+    El mensaje va en nombre del comercio (`merchant_name` en cabecera y en el
+    «De» visible); la plataforma firma el pie. La dirección `From` no cambia:
+    sigue siendo la configurada, que es la que autentican SPF/DKIM/DMARC.
+    """
+    ensure_email_configured(settings)
+    assert settings.email_from is not None and settings.email_smtp_host is not None
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = (
+        formataddr((merchant_name, settings.email_from)) if merchant_name else settings.email_from
+    )
+    message["To"] = recipient
+    message.set_content(_render_text(merchant_name, subject, text, action_url))
+    message.add_alternative(
+        _render_html(merchant_name, subject, text, action_url, cta_label),
+        subtype="html",
+    )
+    _deliver_message(settings, message)
+
+
+def _render_support_text(subject: str, text: str, action_url: str) -> str:
+    return (
+        f"Soporte LocalAI Fidelity\n\n{subject}\n\n{text}\n\n"
+        f"Abrir el buzón de soporte:\n{action_url}\n\n"
+        "Este es un aviso automático del servicio de soporte. "
+        "Responde desde el panel para mantener la conversación."
+    )
+
+
+def send_support_email(
+    settings: Settings,
+    recipient: str,
+    subject: str,
+    text: str,
+    action_url: str,
+) -> None:
+    """Correo del soporte con identidad genérica, nunca datos personales.
+
+    Usa `SUPPORT_FROM_EMAIL` si existe; si no, `EMAIL_FROM`. El nombre visible
+    es siempre «Soporte LocalAI Fidelity»: el comercio no debe conocer al
+    propietario ni su correo personal (Plan.md §12.6).
+    """
+    sender = settings.support_from_email or settings.email_from
+    delivery = settings.model_copy(update={"email_from": sender})
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = formataddr(("Soporte LocalAI Fidelity", sender or ""))
+    message["To"] = recipient
+    message.set_content(_render_support_text(subject, text, action_url))
+    message.add_alternative(
+        _render_html(
+            "Soporte LocalAI Fidelity",
+            subject,
+            text,
+            action_url,
+            "Abrir el buzón",
+            subtitle="Atención al cliente",
+        ),
+        subtype="html",
+    )
+    _deliver_message(delivery, message)
 
 
 def _smtp_deliver(smtp: smtplib.SMTP, settings: Settings, message: EmailMessage) -> None:
