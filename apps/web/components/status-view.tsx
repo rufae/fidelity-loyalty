@@ -222,7 +222,7 @@ export function StatusView() {
             {" "}
             · documentación OpenAPI en{" "}
             <a
-              className="font-semibold text-brand underline-offset-2 hover:underline"
+              className="inline-flex min-h-11 items-center rounded-lg px-2 font-semibold text-brand underline-offset-2 hover:underline"
               href="http://localhost:8101/docs"
             >
               localhost:8101/docs

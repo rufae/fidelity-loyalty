@@ -17,6 +17,7 @@ import {
 import { ApiError } from "@/lib/api";
 import { fidelity, type PublicCard, type WalletOptions } from "@/lib/fidelity";
 import { nextReward } from "@/components/ui/loyalty-card";
+import { ArtSparkles } from "@/components/ui/art";
 import { sellos } from "@/lib/ui";
 
 /** Cada cuánto se comprueba si el saldo o el estado cambiaron (ms). */
@@ -51,6 +52,9 @@ export function CardView({ token }: { token: string }) {
       if (caught instanceof ApiError) {
         // 409/403: suspendida, revocada o inactiva. El mensaje del backend es
         // claro y no sensible; el sondeo sigue por si se reactiva.
+        // Los fallos de red (status 0) NO invalidan el estado: se conserva
+        // lo último mostrado y el sondeo reintenta solo.
+        if (caught.status === 0) return;
         setInactive(caught.message);
         return;
       }
@@ -121,7 +125,8 @@ export function CardView({ token }: { token: string }) {
   const hasRealWallet = Boolean(wallet && !wallet.simulated && wallet.actions.length > 0);
 
   return (
-    <main className="mx-auto max-w-lg px-4 pb-12 pt-5 sm:px-6 sm:pt-7">
+    <main className="relative mx-auto max-w-lg px-4 pb-12 pt-5 sm:px-6 sm:pt-7">
+      <ArtSparkles className="pointer-events-none absolute -top-1 right-3 h-12 w-12 opacity-60" />
       <header className="animate-in mb-4 flex items-end justify-between gap-3">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-brand">

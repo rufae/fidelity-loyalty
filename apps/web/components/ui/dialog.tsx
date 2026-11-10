@@ -1,5 +1,5 @@
 /** Diálogo de confirmación accesible (§8.4): foco, Escape y cierre explícito. */
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/primitives";
 import { IconClose } from "@/components/ui/icons";
@@ -18,13 +18,38 @@ export function Modal({
   footer?: ReactNode;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  /** Carrera de React: el `id` estable para `aria-labelledby`. */
+  const [titleId] = useState(() => `dialog-title-${Math.random().toString(36).slice(2, 10)}`);
 
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
     closeRef.current?.focus();
+
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      // Trampa de foco: Tab y Shift+Tab recorren solo el interior del modal
+      // (WCAG 2.2 §2.4.3 — un `dialog` con foco activo fuera de él deja el
+      // resto de la página navegable por teclado mientras está modal).
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0] as HTMLElement;
+      const last = focusable[focusable.length - 1] as HTMLElement;
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !dialogRef.current.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
     document.addEventListener("keydown", onKey);
     return () => {
@@ -43,13 +68,16 @@ export function Modal({
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={typeof title === "string" ? title : undefined}
+        aria-labelledby={titleId}
         className="animate-pop max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-surface shadow-lift"
       >
         <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
-          <h2 className="text-base font-bold text-ink">{title}</h2>
+          <h2 id={titleId} className="text-base font-bold text-ink">
+            {title}
+          </h2>
           <button
             ref={closeRef}
             type="button"

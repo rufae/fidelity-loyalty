@@ -27,6 +27,7 @@ import {
   StatusPill,
   IconWallet,
 } from "@/components/ui";
+import { ArtSparkles } from "@/components/ui/art";
 import { ApiError } from "@/lib/api";
 import {
   fidelity,
@@ -315,6 +316,7 @@ export function NfcView({ merchantId }: { merchantId: string }) {
                 aria-hidden="true"
                 className="absolute -right-8 -top-10 size-28 rounded-full border border-white/15"
               />
+              <ArtSparkles className="pointer-events-none absolute right-3 top-3 h-9 w-9 opacity-70" />
               <p className="relative text-[11px] font-semibold uppercase tracking-[0.13em] text-white/60">
                 Total de clics
               </p>

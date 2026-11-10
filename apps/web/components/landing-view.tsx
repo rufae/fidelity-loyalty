@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { LoyaltyCard } from "@/components/ui/loyalty-card";
 import { BrandLogo, LinkButton } from "@/components/ui/primitives";
+import { ArtCoffeeCup, ArtNfcTap, ArtSparkles, ArtStorefront, ArtUnderline } from "@/components/ui/art";
 import {
   IconArrowRight,
   IconCheck,
@@ -73,14 +74,19 @@ export function LandingView() {
 
       {/* Héroe: la tarjeta es la protagonista, no una rejilla de ventajas. */}
       <section className="relative mx-auto w-full max-w-6xl px-5 pb-10 pt-6 sm:px-8 sm:pb-16 sm:pt-10">
+        <ArtSparkles className="pointer-events-none absolute right-6 top-4 hidden h-14 w-14 opacity-90 sm:block lg:right-14" />
+        <ArtSparkles className="pointer-events-none absolute left-2 top-40 hidden h-10 w-10 -scale-x-100 opacity-60 xl:block" />
         <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
           <div className="animate-in">
             <p className="inline-flex items-center gap-2 rounded-full border border-brand/15 bg-brand-soft/70 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.13em] text-brand">
               <span aria-hidden="true" className="size-1.5 rounded-full bg-brand" />
               Fidelización y reseñas para negocios de barrio
             </p>
-            <h1 className="mt-5 text-[38px] font-bold leading-[1.04] tracking-[-0.03em] text-ink sm:text-[52px]">
-              Tu programa de fidelización, funcionando en minutos
+            <h1 className="relative mt-5 text-[38px] font-bold leading-[1.04] tracking-[-0.03em] text-ink sm:text-[52px]">
+              <span className="relative inline-block">
+                Tu programa de fidelización, funcionando en&nbsp;minutos
+                <ArtUnderline className="absolute -bottom-2 left-4 h-3.5 w-[72%] sm:-bottom-3 md:left-6" />
+              </span>
             </h1>
             <p className="mt-5 max-w-xl text-[16px] leading-relaxed text-ink-soft sm:text-[17px]">
               Tarjetas digitales con sellos y premios, altas por etiqueta NFC o QR y un acceso
@@ -141,7 +147,7 @@ export function LandingView() {
               </span>
             </div>
 
-            {/* Pequeño ticket de recompensa: refuerza el concepto sin datos falsos. */}
+            {/* Pequeño ticket de recompensa + taza ilustrada: todos queremos un café. */}
             <div className="absolute -bottom-7 -left-3 hidden w-52 -rotate-3 sm:block">
               <div className="ticket-notch rounded-xl border border-gold/25 bg-gold-soft px-4 py-3 shadow-soft">
                 <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-gold">
@@ -151,6 +157,7 @@ export function LandingView() {
                 <p className="text-[11px] text-ink-soft">A un sello de conseguirlo</p>
               </div>
             </div>
+            <ArtCoffeeCup className="pointer-events-none absolute -right-10 top-2 hidden h-24 w-24 opacity-95 xl:block" />
           </div>
         </div>
       </section>
@@ -196,9 +203,12 @@ export function LandingView() {
               aria-hidden="true"
               className="absolute right-0 top-0 h-24 w-24 rounded-bl-[64px] bg-brand-soft"
             />
-            <span className="relative flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-brand">
-              <IconGift size={24} />
-            </span>
+            <div className="relative flex items-start justify-between gap-4">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-brand-soft text-brand">
+                <IconGift size={24} />
+              </span>
+              <ArtStorefront className="-mr-3 -mt-3 hidden h-20 w-[110px] shrink-0 lg:block" />
+            </div>
             <h2 className="relative mt-5 text-[24px] font-bold tracking-tight text-ink">
               Para tu comercio
             </h2>
@@ -231,9 +241,12 @@ export function LandingView() {
             id="clientes"
             className="relative flex scroll-mt-6 flex-col overflow-hidden rounded-3xl border border-line bg-paper p-6 shadow-soft sm:p-8"
           >
-            <span className="flex size-12 items-center justify-center rounded-2xl bg-teal-soft text-teal">
-              <IconScan size={24} />
-            </span>
+            <div className="flex items-start justify-between gap-4">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-teal-soft text-teal">
+                <IconScan size={24} />
+              </span>
+              <ArtNfcTap className="-mr-2 -mt-2 hidden h-20 w-[96px] shrink-0 lg:block" />
+            </div>
             <h2 className="mt-5 text-[24px] font-bold tracking-tight text-ink">
               Para tus clientes
             </h2>

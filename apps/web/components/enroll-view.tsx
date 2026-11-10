@@ -10,11 +10,10 @@ import {
   IconCheck,
   IconGift,
   IconMail,
-  IconScan,
-  IconSparkles,
   Input,
   LoadingState,
 } from "@/components/ui";
+import { ArtCoffeeCup, ArtNfcTap, ArtRewards, ArtSparkles } from "@/components/ui/art";
 import { ApiError } from "@/lib/api";
 import { fidelity, type PublicProgram } from "@/lib/fidelity";
 import { sellos } from "@/lib/ui";
@@ -126,6 +125,7 @@ export function EnrollView({
       <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-5 py-14">
         <div className="animate-in overflow-hidden rounded-3xl border border-line bg-surface shadow-lift">
           <div className="mesh-brand grain relative px-7 py-8 text-center text-white">
+            <ArtSparkles className="pointer-events-none absolute right-5 top-4 h-10 w-10 opacity-80 sm:h-12 sm:w-12" />
             <span className="relative mx-auto flex size-16 items-center justify-center rounded-2xl border border-white/25 bg-white/15 text-white backdrop-blur-sm">
               <IconMail size={30} />
             </span>
@@ -195,24 +195,17 @@ export function EnrollView({
         </div>
       </header>
 
-      {/* Cómo funciona: línea de tres pasos, no tres tarjetas idénticas. */}
+      {/* Cómo funciona: tres estampas ilustradas, no tres tarjetas idénticas. */}
       <section className="mt-6" aria-labelledby="como-funciona">
         <h2 id="como-funciona" className="sr-only">
           Cómo funciona
         </h2>
         <ol className="grid grid-cols-3 gap-2">
-          {[
-            { icon: IconScan, text: "Escaneas el QR o acercas la etiqueta" },
-            { icon: IconSparkles, text: "Te das de alta con nombre y correo" },
-            { icon: IconGift, text: "Sumas sellos y consigues premios" },
-          ].map(({ icon: Icon, text }, index) => (
-            <li key={text} className="relative rounded-2xl border border-line bg-surface p-3 text-center">
-              <span className="mx-auto flex size-9 items-center justify-center rounded-xl bg-brand-soft text-brand">
-                <Icon size={18} />
-              </span>
-              <p className="mt-2 text-[11px] leading-snug text-ink-soft">{text}</p>
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">
-                Paso {index + 1}
+          {[ArtNfcTap, ArtCoffeeCup, ArtRewards].map((Art, index) => (
+            <li key={index} className="relative overflow-hidden rounded-2xl border border-line bg-paper p-3 text-center shadow-soft">
+              <Art className="mx-auto h-14 w-[74px]" />
+              <p className="mt-2 text-[11px] font-semibold leading-snug text-ink">
+                {["Te acercas al mostrador", "Te das de alta en un minuto", "Sumas sellos y ganas"][index]}
               </p>
             </li>
           ))}

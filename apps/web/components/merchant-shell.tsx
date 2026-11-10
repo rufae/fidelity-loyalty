@@ -124,6 +124,10 @@ export function MerchantShell({
   const [merchantName, setMerchantName] = useState<string>("");
   const [role, setRole] = useState<MerchantRole | null>(null);
   const [allowed, setAllowed] = useState<boolean | null>(null);
+  /** El esqueleto no puede ser un pringue eterno: si la sesión no carga, se lo explicamos. */
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  /** Reintento del usuario: cada intento relanza la carga de sesión. */
+  const [attempt, setAttempt] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
 
   /** Cierra la sesión del panel (logout real en backend) y vuelve al acceso. */
@@ -139,13 +143,14 @@ export function MerchantShell({
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+    const load = async (): Promise<void> => {
       try {
         const payload = await apiFetch<SessionPayload>("/api/v1/auth/me");
         const visible =
           isPlatformAdmin(payload.user) ||
           payload.merchants.some((m) => m.merchant_id === merchantId);
         if (cancelled) return;
+        setSessionError(null);
         setSession(payload);
         setAllowed(visible);
         if (!visible) {
@@ -169,13 +174,24 @@ export function MerchantShell({
         }
       } catch (err) {
         if (cancelled) return;
-        if (err instanceof ApiError && err.status === 401) router.push("/login");
+        if (err instanceof ApiError && err.status === 401) {
+          router.push("/login");
+          return;
+        }
+        // Red caída o error del servidor: mensaje claro + reintentar aquí
+        // mismo, nunca un esqueleto vacío sin salida.
+        setSessionError(
+          err instanceof ApiError
+            ? err.message
+            : "No se pudo comprobar tu sesión. Inténtalo de nuevo.",
+        );
       }
-    })();
+    };
+    void load();
     return () => {
       cancelled = true;
     };
-  }, [merchantId, router]);
+  }, [merchantId, router, attempt]);
 
   // Cierra el cajón al cambiar de pantalla (ajuste de estado durante el render).
   const [prevPath, setPrevPath] = useState(pathname);
@@ -201,6 +217,9 @@ export function MerchantShell({
     }
   }, [allowed, requires, platformAdmin, role, router, root]);
 
+  if (sessionError && allowed === null) {
+    return <ShellSkeleton error={sessionError} onRetry={() => setAttempt((n) => n + 1)} />;
+  }
   if (allowed !== true) {
     return <ShellSkeleton />;
   }
@@ -416,7 +435,33 @@ export function MerchantShell({
 }
 
 /** Skeleton de la estructura real: sin destellos de contenido privado. */
-function ShellSkeleton() {
+function ShellSkeleton({
+  error,
+  onRetry,
+}: {
+  error?: string;
+  onRetry?: () => void;
+}) {
+  if (error) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6 text-center">
+        <span className="flex size-14 items-center justify-center rounded-2xl bg-surface-2 text-ink-faint">
+          <IconGrid size={26} />
+        </span>
+        <h1 className="mt-4 text-lg font-bold tracking-tight text-ink">
+          No se pudo abrir tu panel
+        </h1>
+        <p role="alert" className="mt-2 text-sm leading-relaxed text-ink-soft">
+          {error}
+        </p>
+        {onRetry && (
+          <Button className="mt-5" onClick={onRetry}>
+            Reintentar
+          </Button>
+        )}
+      </main>
+    );
+  }
   return (
     <div className="min-h-screen lg:flex" aria-busy="true">
       <p className="sr-only" role="status">

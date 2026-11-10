@@ -18,6 +18,7 @@ import {
   StampRow,
 } from "@/components/ui";
 import { QrScanner } from "@/components/qr-scanner";
+import { ArtQrScan } from "@/components/ui/art";
 import { ApiError } from "@/lib/api";
 import {
   extractCardCode,
@@ -220,10 +221,15 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
       );
       await refreshHistory(membership.id);
     } catch (err) {
-      if (err instanceof ApiError) {
+      if (err instanceof ApiError && err.status >= 400) {
+        // Rechazo del servidor: la operación NO quedó registrada.
         setError(err.message);
       } else {
-        setError("No se pudo acumular.");
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "No se pudo acumular.",
+        );
         setNetworkWarning(
           "Antes de repetir la operación, comprueba el saldo de la tarjeta: si la petición llegó al servidor, el sello ya estará registrado.",
         );
@@ -256,10 +262,15 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
       );
       await refreshHistory(membership.id);
     } catch (err) {
-      if (err instanceof ApiError) {
+      if (err instanceof ApiError && err.status >= 400) {
+        // Rechazo del servidor: la operación NO quedó registrada.
         setError(err.message);
       } else {
-        setError("No se pudo canjear.");
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "No se pudo canjear.",
+        );
         setNetworkWarning(
           "Antes de repetir la operación, comprueba el saldo: el canje podría haberse registrado ya en el servidor.",
         );
@@ -282,11 +293,16 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
     <div className="space-y-5">
       {/* Consola de identificación: una sola entrada, botones alineados. */}
       <Panel className="animate-in">
-        <SectionTitle
-          title="Identifica la tarjeta"
-          description="Escanea el QR del cliente o pega su código. También se acepta la URL completa que muestra el QR."
-          icon={<IconScan size={18} />}
-        />
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <SectionTitle
+              title="Identifica la tarjeta"
+              description="Escanea el QR del cliente o pega su código. También se acepta la URL completa que muestra el QR."
+              icon={<IconScan size={18} />}
+            />
+          </div>
+          <ArtQrScan className="-mt-3 -mr-1 hidden h-20 w-[104px] shrink-0 opacity-90 lg:block" />
+        </div>
         <form onSubmit={lookup} className="space-y-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1 space-y-1.5">

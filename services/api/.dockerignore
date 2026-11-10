@@ -1,6 +1,12 @@
 __pycache__/
+*.py[cod]
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
 .venv/
 tests/
+*.log
+# Secretos jamás al contexto de build (§16.1).
+.env
+.env.*
+!.env.example

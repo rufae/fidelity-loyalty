@@ -24,6 +24,7 @@ import {
 } from "@/components/ui";
 import { useMerchant } from "@/components/merchant-context";
 import { fidelity, type DashboardSummary } from "@/lib/fidelity";
+import { ArtSparkles } from "@/components/ui/art";
 import { canManageMerchant } from "@/lib/session";
 import { formatNumber } from "@/lib/ui";
 
@@ -106,6 +107,7 @@ export function MerchantDashboard() {
     <div className="space-y-7">
       {/* Bienvenida con una acción útil de verdad: operar en el mostrador. */}
       <BrandPanel className="animate-in p-6 sm:p-8" tone="brand">
+        <ArtSparkles className="pointer-events-none absolute right-6 top-5 hidden h-12 w-12 opacity-70 md:block" />
         <div className="grid grid-cols-1 items-center gap-7 lg:grid-cols-[1.25fr_0.75fr]">
           <div>
             <div className="flex flex-wrap items-center gap-2.5">

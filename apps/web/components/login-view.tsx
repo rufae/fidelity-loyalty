@@ -21,6 +21,7 @@ import {
 } from "@/components/ui";
 import { ApiError, apiFetch } from "@/lib/api";
 import { isPlatformAdmin, type SessionPayload } from "@/lib/session";
+import { ArtSparkles } from "@/components/ui/art";
 
 export function LoginView() {
   const router = useRouter();
@@ -71,6 +72,7 @@ export function LoginView() {
           aria-hidden="true"
           className="pointer-events-none absolute -bottom-32 -left-20 size-96 rounded-full border border-white/10"
         />
+        <ArtSparkles className="pointer-events-none absolute right-8 top-8 h-14 w-14 opacity-80" />
 
         <div className="relative flex items-center justify-between">
           <BrandLogo tone="inverse" />
@@ -137,7 +139,11 @@ export function LoginView() {
         <div className="w-full max-w-[400px]">
           <div className="flex items-center justify-between lg:hidden">
             <BrandLogo />
-            <Link href="/" className="text-xs font-semibold text-ink-soft hover:text-brand">
+            {/* Táctil ≥44px (WCAG 2.2 §2.5.8): el enlace vuelve al origen público. */}
+            <Link
+              href="/"
+              className="-my-1 inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold text-ink-soft hover:text-brand"
+            >
               Volver
             </Link>
           </div>
