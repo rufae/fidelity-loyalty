@@ -191,6 +191,43 @@ sin `AUTH_SESSION_SECRET` la API no arranca (§16.2), y los valores de ejemplo
 públicos de `.env.example` son **rechazados al arrancar** en producción
 (sesión, bootstrap y `DATABASE_URL`).
 
+### Pruebas desde el móvil (red local, con HTTPS)
+
+La cámara (`getUserMedia`) solo funciona en un contexto seguro, es decir sobre
+**HTTPS**. Para probar desde un móvil en la misma Wi‑Fi sin instalar VPN:
+
+```bash
+# 1) El web de Docker debe estar levantado (escucha solo en loopback)
+docker compose up -d web
+
+# 2) Genera un certificado autofirmado con la IP de LAN (una vez)
+mkdir -p apps/web/.certs
+openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 825 \
+  -keyout apps/web/.certs/dev-lan-key.pem \
+  -out apps/web/.certs/dev-lan-cert.pem \
+  -subj "/CN=192.168.1.110" \
+  -addext "subjectAltName=IP:192.168.1.110,IP:127.0.0.1,DNS:localhost"
+
+# 3) Arranca el proxy TLS (módulos nativos de Node, sin dependencias)
+node scripts/tls-proxy.mjs
+```
+
+Y desde el móvil, con la **misma Wi‑Fi**: **`https://192.168.1.110:8443`**
+
+- Sustituye `192.168.1.110` por la IP de este servidor en tu red
+  (`ip -4 addr show | grep wlp`).
+- El navegador avisará de **certificado no confiable** (es autofirmado).
+  En Android/Chrome: «Avanzado → Continuar». La cámara ya funcionará porque
+  la conexión es HTTPS.
+- Para eliminar el aviso, instala `apps/web/.certs/dev-lan-cert.pem` como
+  certificado de usuario en el móvil.
+- Puerto configurable con `TLS_PROXY_PORT`; el proxy reenvía al web de Docker
+  (`127.0.0.1:8100`) sin exponerlo directamente a la LAN.
+
+Si pruebas códigos QR generados con la URL pública, ajusta
+`PUBLIC_BASE_URL=https://192.168.1.110:8443` en `.env` para que apunten a la
+misma dirección. El proxy es solo para desarrollo: **no se usa en producción**.
+
 ### Variables de entorno
 
 Ver [`.env.example`](./.env.example). Los secretos van siempre en `.env`

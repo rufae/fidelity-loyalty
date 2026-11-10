@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Certificados autofirmados de desarrollo (nunca en Git, §16.1).
+.certs/
+
 # Copias de seguridad locales
 backup/
 
