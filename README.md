@@ -196,11 +196,14 @@ públicos de `.env.example` son **rechazados al arrancar** en producción
 La cámara (`getUserMedia`) solo funciona en un contexto seguro, es decir sobre
 **HTTPS**. Para probar desde un móvil en la misma Wi‑Fi sin instalar VPN:
 
-```bash
-# 1) El web de Docker debe estar levantado (escucha solo en loopback)
-docker compose up -d web
+> **Por qué en contenedor:** el ufw del servidor bloquea todo el tráfico
+> entrante excepto SSH y los puertos que publica Docker. Un proxy corriendo
+> como proceso normal en el host queda bloqueado (`:8443` da timeout desde
+> otro equipo), así que el proxy TLS vive en un contenedor: su publicación
+> pasa por las reglas de Docker y **no hay que abrir puertos en el firewall**.
 
-# 2) Genera un certificado autofirmado con la IP de LAN (una vez)
+```bash
+# 1) Genera el certificado autofirmado con la IP de LAN (una vez)
 mkdir -p apps/web/.certs
 openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 825 \
   -keyout apps/web/.certs/dev-lan-key.pem \
@@ -208,8 +211,8 @@ openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 825 \
   -subj "/CN=192.168.1.110" \
   -addext "subjectAltName=IP:192.168.1.110,IP:127.0.0.1,DNS:localhost"
 
-# 3) Arranca el proxy TLS (módulos nativos de Node, sin dependencias)
-node scripts/tls-proxy.mjs
+# 2) Levanta el proxy TLS (perfil opt-in: no arranca con `docker compose up`)
+docker compose --profile lan-tls up -d lan-tls
 ```
 
 Y desde el móvil, con la **misma Wi‑Fi**: **`https://192.168.1.110:8443`**
@@ -221,12 +224,16 @@ Y desde el móvil, con la **misma Wi‑Fi**: **`https://192.168.1.110:8443`**
   la conexión es HTTPS.
 - Para eliminar el aviso, instala `apps/web/.certs/dev-lan-cert.pem` como
   certificado de usuario en el móvil.
-- Puerto configurable con `TLS_PROXY_PORT`; el proxy reenvía al web de Docker
-  (`127.0.0.1:8100`) sin exponerlo directamente a la LAN.
+- El servicio `lan-tls` reenvía a `web:8100` dentro de la red de Docker; el
+  web sigue escuchando solo en loopback y no se expone directamente.
+- Detenerlo: `docker compose --profile lan-tls stop lan-tls`.
+- Servidor alternativo: `node scripts/tls-proxy.mjs` (mismos ficheros, sirve
+  en el puerto `8443` del host) **solo si no hay ufw filtrando**.
 
 Si pruebas códigos QR generados con la URL pública, ajusta
 `PUBLIC_BASE_URL=https://192.168.1.110:8443` en `.env` para que apunten a la
-misma dirección. El proxy es solo para desarrollo: **no se usa en producción**.
+misma dirección. Todo esto es solo para desarrollo: **no se usa en producción**
+(el perfil `lan-tls` no está pensado para el despliegue del HP).
 
 ### Variables de entorno
 

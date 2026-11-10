@@ -157,5 +157,39 @@ services:
       timeout: 5s
       retries: 6
       start_period: 20s
+  lan-tls:
+    # Proxy TLS de desarrollo para pruebas desde la red local (§16.2).
+    #
+    # Motivo: la cámara (`getUserMedia`) solo funciona sobre HTTPS, y el ufw
+    # del servidor bloquea todo lo entrante excepto lo que publica Docker.
+    # Por eso el proxy vive en un contenedor: su publicación pasa por las
+    # reglas de Docker y no requiere abrir puertos en el firewall del host.
+    #
+    # Uso (opt-in, NO arranca con `docker compose up` normal):
+    #   docker compose --profile lan-tls up -d lan-tls
+    #   → desde el móvil, en la misma Wi-Fi: https://192.168.1.110:8443
+    #
+    # Solo para desarrollo: no se usa ni se levanta en producción.
+    image: node:24-alpine
+    profiles: ["lan-tls"]
+    restart: "no"
+    working_dir: /app
+    command: ["node", "/app/tls-proxy.mjs"]
+    volumes:
+      - ./scripts/tls-proxy.mjs:/app/tls-proxy.mjs:ro
+      - ./apps/web/.certs:/certs:ro
+    environment:
+      TLS_PROXY_HOST: 0.0.0.0
+      TLS_PROXY_PORT: "8443"
+      TLS_PROXY_TARGET_HOST: web
+      TLS_PROXY_TARGET_PORT: "8100"
+      TLS_KEY: /certs/dev-lan-key.pem
+      TLS_CERT: /certs/dev-lan-cert.pem
+    ports:
+      # Publicación Docker: alcanzable desde la LAN (el ufw no la bloquea).
+      - "8443:8443"
+    depends_on:
+      web:
+        condition: service_healthy
 volumes:
   pgdata:
