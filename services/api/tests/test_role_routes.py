@@ -80,6 +80,7 @@ def _admin_routes(client: TestClient, merchant_id: uuid.UUID) -> list[int]:
         client.get(f"/api/v1/merchants/{merchant_id}/memberships").status_code,
         client.get(f"/api/v1/merchants/{merchant_id}/nfc-tags").status_code,
         client.get(f"/api/v1/merchants/{merchant_id}/dashboard/summary").status_code,
+        client.get(f"/api/v1/merchants/{merchant_id}/dashboard/onboarding").status_code,
         client.get(f"/api/v1/merchants/{merchant_id}/review-destination").status_code,
     ]
 
