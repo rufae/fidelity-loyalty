@@ -143,7 +143,7 @@ export function ReviewsView({ merchantId }: { merchantId: string }) {
   ];
 
   return (
-    <div className="max-w-5xl space-y-6">
+    <div className="stagger max-w-5xl space-y-6">
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_340px] lg:items-start">
         <Panel className="animate-in">
           <SectionTitle

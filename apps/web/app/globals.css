@@ -76,6 +76,25 @@
 html {
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
+  /* Superficies del navegador con el color del diseño, no del sistema. */
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+/* Scrollbar fino y cálido: hasta el scrolling fue diseñado. */
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border: 3px solid var(--color-canvas);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-faint);
 }
 
 body {
@@ -183,6 +202,19 @@ body::before {
   opacity: 0.28;
 }
 
+/*
+ * Tile de marca: el avatar cuadrado de comercios y usuarios. Un solo sitio
+ * para el degradado de la marca y su luz interna (borde superior iluminado),
+ * como un azulejo de mostrador.
+ */
+.brand-tile {
+  background-image: linear-gradient(145deg, #6c5ce7 0%, #5b48d6 55%, #4633b8 100%);
+  color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    0 2px 5px rgb(62 47 30 / 0.24);
+}
+
 /* ------------------------------- animaciones ------------------------------ */
 
 @keyframes fade-up {
@@ -214,6 +246,24 @@ body::before {
     opacity: 1;
     transform: none;
   }
+}
+
+/** Mutación de precio en /precios: el span remonta al cambiar de facturación. */
+@keyframes price-morph {
+  from {
+    transform: scale(0.94);
+    filter: blur(4px);
+    opacity: 0.55;
+  }
+  to {
+    transform: none;
+    filter: blur(0);
+    opacity: 1;
+  }
+}
+
+.price-morph {
+  animation: price-morph 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes shimmer {
@@ -257,6 +307,114 @@ body::before {
   50% {
     transform: translate3d(2%, -2%, 0) scale(1.05);
   }
+}
+
+/* --------------------------- portada: el espécimen vivo -------------------- */
+
+/* Anillo NFC: pulso que nace de la tarjeta y se disipa. */
+@keyframes nfc-ripple {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.5;
+  }
+  70% {
+    opacity: 0.08;
+  }
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+
+/* Chispa de la ilustración: titileo propio, no parpadeo de anuncio. */
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.94) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06) rotate(8deg);
+  }
+}
+
+/* Vapor de la taza: sube, se disipa, vuelve a empezar. */
+@keyframes steam-rise {
+  0% {
+    transform: translateY(2px);
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.75;
+  }
+  100% {
+    transform: translateY(-9px);
+    opacity: 0;
+  }
+}
+
+/* Trazado del subrayado a mano: se dibuja una vez, al entrar. */
+@keyframes underline-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Folios tras la tarjeta: respiran cada uno a su compás, conservando su giro. */
+@keyframes sheet-drift {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--sheet-rotate, 0deg));
+  }
+  50% {
+    transform: translateY(-7px) rotate(calc(var(--sheet-rotate, 0deg) + 1deg));
+  }
+}
+
+.nfc-ring {
+  animation: nfc-ripple 2.8s var(--ease-out-quint) infinite;
+}
+
+.animate-twinkle {
+  animation: twinkle 3.4s ease-in-out infinite;
+}
+
+.steam {
+  animation: steam-rise 2.8s ease-in-out infinite;
+}
+
+.steam-late {
+  animation-delay: 1.4s;
+}
+
+.sheet-drift {
+  animation: sheet-drift 8s ease-in-out infinite;
+}
+
+/*
+ * Escenario del héroe: la tarjeta inclina en 3D siguiendo al puntero vía
+ * `--tilt-x/--tilt-y` (las fija el componente cliente). El destello comparte
+ * centro con el cursor vía `--glow-x/--glow-y`. Ritual de cortesía: se apaga
+ * en pantallas táctiles desde el componente y en reduced-motion global.
+ */
+.tilt-stage {
+  transform: perspective(1200px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transition: transform 0.45s var(--ease-out-quint);
+}
+
+.stage-sheen {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  background: radial-gradient(
+    20rem 16rem at var(--glow-x, 50%) var(--glow-y, 50%),
+    rgb(139 124 246 / 0.14),
+    transparent 68%
+  );
+}
+
+.tilt-zone:hover .stage-sheen {
+  opacity: 1;
 }
 
 .animate-in {
@@ -335,4 +493,37 @@ body::before {
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Póster imprimible (§14.2): al imprimir solo queda la hoja del póster.
+   El chrome del panel (barra, lateral, migas, títulos y controles) se
+   marca con `data-print="hide"`; el resto se limpia para papel A4. */
+@media print {
+  [data-print="hide"] {
+    display: none !important;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  main#contenido {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .poster-sheet {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
+/* Lienzo de papel para el póster del mostrador (§14.1-§14.2). */
+@page {
+  size: A4 portrait;
+  margin: 12mm;
 }

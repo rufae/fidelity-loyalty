@@ -164,10 +164,10 @@ export function StatusView() {
       </Panel>
 
       {walletDemo && (
-        <Alert tone="warn" title="La integración con Apple Wallet y Google Wallet está en modo demostración">
-          La tarjeta web y el QR funcionan de verdad; los pases nativos se emitirán cuando se
-          configuren las credenciales de cada proveedor. Nunca se presenta un pase simulado como
-          emitido.
+        <Alert tone="warn" title="Apple Wallet y Google Wallet no están disponibles de momento">
+          La tarjeta web y el QR funcionan de verdad desde el navegador. Los
+          pases nativos llegarán más adelante, cuando se configuren y verifiquen
+          las credenciales de cada proveedor.
         </Alert>
       )}
 

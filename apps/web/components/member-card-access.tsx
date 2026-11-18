@@ -45,7 +45,7 @@ export function MemberCardAccess({ merchantSlug }: { merchantSlug: string }) {
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-10 sm:px-6">
       <section className="animate-in overflow-hidden rounded-3xl border border-line bg-surface shadow-lift">
         <div className="relative border-b border-line bg-paper px-6 py-7 text-center sm:px-8">
-          <ArtSparkles className="pointer-events-none absolute right-5 top-4 h-10 w-10 opacity-70" />
+          <ArtSparkles className="animate-twinkle pointer-events-none absolute right-5 top-4 h-10 w-10 opacity-70" />
           <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-brand-soft text-brand shadow-soft">
             <IconMail size={26} />
           </span>

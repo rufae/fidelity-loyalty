@@ -184,7 +184,11 @@ test("administración del comercio: panel completo (sin enlace técnico)", async
   // /estado no es para comercios: vuelve a la portada pública.
   await page.goto("/estado");
   await page.waitForURL(`${BASE}/`);
-  await expect(page.getByText("Tu programa de fidelización, funcionando en minutos")).toBeVisible();
+  // El anuncio de ruta (route announcer) replica el h1: el rol de título
+  // selecciona solo el elemento real de la portada.
+  await expect(
+    page.getByRole("heading", { name: "Tu programa de fidelización, funcionando en minutos" }),
+  ).toBeVisible();
 });
 
 test("plataforma: lista de comercios y diagnóstico reservado", async ({ page }) => {

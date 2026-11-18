@@ -64,6 +64,19 @@ export function LoginView() {
     <main className="min-h-screen lg:grid lg:grid-cols-[1.02fr_0.98fr]">
       {/* Bloque de marca: la tarjeta como bienvenida, siempre rotulada como ejemplo. */}
       <aside className="mesh-brand grain relative hidden flex-col justify-between overflow-hidden p-10 text-white lg:flex xl:p-14">
+        {/* Auroras: luz suave que respira sobre el papel móvil de marca. */}
+        <div
+          aria-hidden="true"
+          className="animate-drift pointer-events-none absolute -top-24 left-[6%] size-80 rounded-full bg-brand-glow/30 blur-3xl"
+        />
+        <div
+          aria-hidden="true"
+          className="animate-drift pointer-events-none absolute -bottom-28 left-[30%] size-96 rounded-full bg-gold-bright/15 blur-3xl [animation-delay:-6s]"
+        />
+        <div
+          aria-hidden="true"
+          className="animate-drift pointer-events-none absolute bottom-[18%] right-[-6%] size-72 rounded-full bg-teal/10 blur-3xl [animation-delay:-3s]"
+        />
         <div
           aria-hidden="true"
           className="animate-drift pointer-events-none absolute -right-24 -top-24 size-80 rounded-full border border-white/15"
@@ -72,7 +85,7 @@ export function LoginView() {
           aria-hidden="true"
           className="pointer-events-none absolute -bottom-32 -left-20 size-96 rounded-full border border-white/10"
         />
-        <ArtSparkles className="pointer-events-none absolute right-8 top-8 h-14 w-14 opacity-80" />
+        <ArtSparkles className="animate-twinkle pointer-events-none absolute right-8 top-8 h-14 w-14 opacity-80" />
 
         <div className="relative flex items-center justify-between">
           <BrandLogo tone="inverse" />
@@ -107,13 +120,15 @@ export function LoginView() {
                 { name: "Desayuno completo", stamps_required: 12 },
               ]}
               variant="card"
+              floating
+              animateStamps
             />
             <span className="absolute -top-2.5 right-4 rounded-full border border-white/25 bg-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white backdrop-blur">
               Ejemplo
             </span>
           </div>
 
-          <ul className="space-y-3 text-sm text-white/85">
+          <ul className="stagger space-y-3 text-sm text-white/85">
             {[
               { icon: IconGift, text: "Programas de sellos y recompensas por comercio." },
               { icon: IconScan, text: "Altas por NFC/QR y tarjeta digital con código propio." },
@@ -163,7 +178,7 @@ export function LoginView() {
 
           <form
             onSubmit={onSubmit}
-            className="mt-7 space-y-4 rounded-2xl border border-line bg-surface p-6 shadow-soft sm:p-7"
+            className="animate-in mt-7 space-y-4 rounded-2xl border border-line bg-surface p-6 shadow-soft sm:p-7"
           >
             <FormField label="Email" required>
               {({ id, describedBy }) => (
@@ -216,6 +231,16 @@ export function LoginView() {
               {loading ? "Entrando…" : "Entrar"}
             </Button>
           </form>
+
+          <p className="mt-3 text-center text-xs text-ink-faint">
+            ¿Olvidaste tu contraseña?{" "}
+            <Link
+              href="/recuperar"
+              className="font-semibold text-brand transition-colors hover:text-brand-strong"
+            >
+              Recuperar acceso
+            </Link>
+          </p>
 
           <p className="mt-5 flex items-start gap-2 text-xs leading-relaxed text-ink-faint">
             <IconLock size={15} className="mt-0.5 shrink-0 text-ink-soft" />
