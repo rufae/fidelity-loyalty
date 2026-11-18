@@ -14,7 +14,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.domain.errors import DomainError, not_found, slug_conflict
-from app.models.loyalty import LoyaltyProgram, ProgramReward, ProgramStatus
+from app.domain.notices import PRIVACY_NOTICE_VERSION
+from app.models.loyalty import LoyaltyProgram, ProgramReward, ProgramStatus, ProgramType
 from app.models.merchant import Merchant
 from app.models.user import utcnow
 from app.schemas.loyalty import (
@@ -23,9 +24,7 @@ from app.schemas.loyalty import (
     RewardCreate,
     RewardUpdate,
 )
-
-#: Versión vigente del aviso de privacidad mostrado en el alta (ADR-0006).
-PRIVACY_NOTICE_VERSION = 1
+from app.services import locations as locations_service
 
 
 def _slugify(value: str) -> str:
@@ -79,6 +78,8 @@ def create_program(session: Session, merchant_id: uuid.UUID, data: ProgramCreate
         program_type=data.program_type,
         description=data.description,
         terms=data.terms,
+        stamps_expire_days=data.stamps_expire_days,
+        points_per_euro=data.points_per_euro,
         status=ProgramStatus.DRAFT,
     )
     session.add(program)
@@ -102,6 +103,12 @@ def update_program(
         if program.terms != data.terms:
             program.terms_version += 1
         program.terms = data.terms
+    if "stamps_expire_days" in data.model_fields_set:
+        # Presente (número o null): cambia la regla para los `earn`
+        # futuros; los lotes ya emitidos conservan su fecha de caducidad.
+        program.stamps_expire_days = data.stamps_expire_days
+    if "points_per_euro" in data.model_fields_set:
+        program.points_per_euro = data.points_per_euro
     session.flush()
     return program
 
@@ -113,6 +120,13 @@ def _require_terms(program: LoyaltyProgram) -> None:
             "program_terms_required",
             "El programa necesita condiciones visibles antes de publicarse",
         )
+    if program.program_type == ProgramType.POINTS and not program.points_per_euro:
+        # Un programa de puntos sin regla no sabe cuánto otorga (§7.6).
+        raise DomainError(
+            422,
+            "points_rule_required",
+            "Define los puntos por euro antes de publicar un programa de puntos",
+        )
 
 
 def publish_program(session: Session, program: LoyaltyProgram) -> LoyaltyProgram:
@@ -123,6 +137,9 @@ def publish_program(session: Session, program: LoyaltyProgram) -> LoyaltyProgram
             "Solo un programa borrador o en pausa puede publicarse",
         )
     _require_terms(program)
+    # Límite del plan: programas **en vivo** simultáneos (§3.3, tasks.md §5).
+    # Se comprueba antes de activar; los borradores no consumen límite.
+    locations_service.ensure_program_slot(session, program.merchant_id)
     program.status = ProgramStatus.ACTIVE
     program.published_at = program.published_at or utcnow()
     session.flush()
@@ -225,4 +242,9 @@ def public_program_payload(
         # Versión del aviso de privacidad del alta (ADR-0006): la conserva
         # el backend para poder acreditar qué versión aceptó el cliente.
         "privacy_notice_version": PRIVACY_NOTICE_VERSION,
+        # Caducidad opcional de sellos (§7.7): el alta la comunica antes
+        # de registrar al cliente.
+        "stamps_expire_days": program.stamps_expire_days,
+        # Regla de puntos por euro si procede (§7.6): el alta la explica.
+        "points_per_euro": program.points_per_euro,
     }

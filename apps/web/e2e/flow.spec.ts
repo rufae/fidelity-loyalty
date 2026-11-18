@@ -136,10 +136,18 @@ test.beforeAll(async () => {
   const programBBody = (await programB.json()) as { id: string; slug: string };
   programBId = programBBody.id;
   programBSlug = programBBody.slug;
+
+  // Dos programas en vivo: el plan básico solo permite uno (tasks.md §5);
+  // este comercio de prueba es Plus.
+  const planBump = await api.patch(`/api/v1/platform/merchants/${merchantId}/plan`, {
+    data: { plan: "plus" },
+  });
+  expect(planBump.ok(), `subir plan → ${planBump.status()}`).toBeTruthy();
+
   const publishB = await api.post(
     `/api/v1/merchants/${merchantId}/programs/${programBId}/publish`,
   );
-  expect(publishB.ok()).toBeTruthy();
+  expect(publishB.ok(), `publicar programa B → ${publishB.status()}`).toBeTruthy();
 
   // Etiqueta de mostrador del segundo programa: el caso interesante es
   // tocar «Menú», escanear una tarjeta y que la promoción activa sea Menú.
@@ -214,11 +222,13 @@ test.describe("alta pública desde la etiqueta NFC (móvil)", () => {
     await page.fill("input[autocomplete=name]", "Cliente E2E");
     await page.fill("input[type=email]", clientEmail);
 
-    // Condiciones y privacidad obligatorias; marketing opcional y sin marcar (§9.4).
+    // Condiciones y privacidad obligatorias (§9.4). Sin casilla de
+    // novedades: el MVP no tiene canal de envío y no se pide un
+    // consentimiento que nadie puede cumplir (§9.6).
     const boxes = page.locator("input[type=checkbox]");
     await boxes.nth(0).check();
     await boxes.nth(1).check();
-    await expect(boxes.nth(2)).not.toBeChecked();
+    await expect(boxes).toHaveCount(2);
 
     await page.click('button:has-text("Quiero mi tarjeta")');
     // El alta ya no entrega la tarjeta en claro: pide confirmar el correo (§9.3).
@@ -243,8 +253,9 @@ test.describe("alta pública desde la etiqueta NFC (móvil)", () => {
     expect(cardToken).not.toContain("@");
     expect(cardToken.length).toBeGreaterThan(8);
 
-    // Honestidad de Wallet: sin credenciales solo hay aviso de demostración.
-    await expect(page.getByText("Modo de demostración").first()).toBeVisible();
+    // Honestidad de Wallet (decisión #4): sin credenciales no hay pase real ni
+    // botones muertos — un aviso claro de que la tarjeta vive en el navegador.
+    await expect(page.getByText("Añadir a Wallet · No disponible de momento")).toBeVisible();
     expect(await page.locator('a:has-text("Añadir a Apple Wallet")').count()).toBe(0);
     expect(await page.locator('a:has-text("Añadir a Google Wallet")').count()).toBe(0);
   });

@@ -41,6 +41,10 @@ const STEPS = [
 export function ProgramsView({ merchantId }: { merchantId: string }) {
   const [programs, setPrograms] = useState<Program[] | null>(null);
   const [name, setName] = useState("");
+  /** Tipo al crear (§7.1): sellos por visita o puntos por importe. */
+  const [type, setType] = useState<"stamps" | "points">("stamps");
+  /** Puntos por euro del modo points: entero 1–1000 (§7.6). */
+  const [rate, setRate] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -66,7 +70,11 @@ export function ProgramsView({ merchantId }: { merchantId: string }) {
     setError(null);
     setLoading(true);
     try {
-      await fidelity.createProgram(merchantId, { name });
+      await fidelity.createProgram(merchantId, {
+        name,
+        program_type: type,
+        ...(type === "points" ? { points_per_euro: rate } : {}),
+      });
       setName("");
       load();
     } catch (err) {
@@ -84,7 +92,7 @@ export function ProgramsView({ merchantId }: { merchantId: string }) {
         : 2;
 
   return (
-    <div className="space-y-6">
+    <div className="stagger space-y-6">
       <Stepper steps={STEPS} current={currentStep} />
 
       {error && (
@@ -108,7 +116,7 @@ export function ProgramsView({ merchantId }: { merchantId: string }) {
             <EmptyState
               illustration="card"
               title="Todavía no hay programas"
-              description="Crea el primero con el formulario de al lado: será el programa de sellos que verán tus clientes."
+              description="Crea el primero con el formulario de al lado: será el programa que verán tus clientes."
             />
           ) : (
             <ul className="stagger grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
@@ -199,9 +207,80 @@ export function ProgramsView({ merchantId }: { merchantId: string }) {
                 />
               )}
             </FormField>
+
+            {/* Modo de acumulación (§7.1): dos opciones claras; la regla
+                de puntos se define aquí y el backend hace el cálculo. */}
+            <FormField
+              label="¿Cómo acumulan tus clientes?"
+              required
+              hint={
+                type === "points"
+                  ? "Los puntos se calculan por importe de venta en el mostrador."
+                  : "Un sello por cada visita confirmada en el mostrador."
+              }
+            >
+              {({ id, describedBy }) => (
+                <div
+                  id={id}
+                  aria-describedby={describedBy}
+                  className="grid grid-cols-2 gap-2"
+                  role="group"
+                >
+                  {(["stamps", "points"] as const).map((option) => (
+                    <label
+                      key={option}
+                      className={`cursor-pointer rounded-xl border px-2 py-2.5 text-center text-sm font-semibold transition-colors ${
+                        type === option
+                          ? "border-brand bg-brand-soft text-brand"
+                          : "border-line bg-surface text-ink-soft hover:border-ink-faint/50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="program-type"
+                        value={option}
+                        checked={type === option}
+                        onChange={() => setType(option)}
+                        className="sr-only"
+                      />
+                      {option === "stamps" ? "Sellos por visita" : "Puntos por euro"}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </FormField>
+
+            {type === "points" && (
+              <FormField
+                label="Puntos por euro"
+                required
+                hint="Ej.: 1 = un punto por cada euro. Entero entre 1 y 1000; el redondeo lo hace el backend hacia abajo (§7.6)."
+              >
+                {({ id, describedBy }) => (
+                  <Input
+                    id={id}
+                    aria-describedby={describedBy}
+                    type="number"
+                    min={1}
+                    max={1000}
+                    step={1}
+                    required
+                    value={rate}
+                    onChange={(e) => setRate(Number(e.target.value))}
+                    placeholder="1"
+                    className="max-w-32"
+                  />
+                )}
+              </FormField>
+            )}
+
             <Button
               type="submit"
               loading={loading}
+              disabled={
+                name.trim().length < 2 ||
+                (type === "points" && (!Number.isInteger(rate) || rate < 1 || rate > 1000))
+              }
               icon={<IconPlus size={17} />}
               className="w-full"
             >
@@ -209,8 +288,8 @@ export function ProgramsView({ merchantId }: { merchantId: string }) {
             </Button>
           </form>
           <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
-            Tipo sellos. El alta pública, el QR y Wallet se configuran después, en el editor del
-            programa y en «NFC y QR».
+            Nace en borrador: en el editor defines reglas, caducidad opcional, recompensas y
+            condiciones antes de publicarlo. El alta pública, el QR y Wallet se configuran después.
           </p>
         </Panel>
       </div>

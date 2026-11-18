@@ -1,23 +1,28 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   Alert,
   Badge,
   Button,
+  CountUp,
   EmptyState,
+  FormField,
   IconCheck,
   IconChevronDown,
   IconGift,
   IconScan,
   IconSearch,
   Input,
+  Modal,
   Panel,
   SectionTitle,
   StampRow,
 } from "@/components/ui";
 import { QrScanner } from "@/components/qr-scanner";
+import { CounterEnroll } from "@/components/counter-enroll";
+import { TodayEnrollments } from "@/components/today-enrollments";
 import { ArtQrScan } from "@/components/ui/art";
 import { ApiError } from "@/lib/api";
 import {
@@ -28,7 +33,7 @@ import {
   type ProgramDetail,
   type TransactionRow,
 } from "@/lib/fidelity";
-import { formatDateTime, sellos, stampSlots } from "@/lib/ui";
+import { formatDateTime, sellos, stampSlots, unidades } from "@/lib/ui";
 
 const TYPE_LABELS: Record<string, string> = {
   earn: "Acumulación",
@@ -88,6 +93,37 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
   );
   const [programNotice, setProgramNotice] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /** Registro de venta por importe (modo points, §7.6). */
+  const [amountOpen, setAmountOpen] = useState(false);
+  const [amountText, setAmountText] = useState("");
+  /** Señal de foco del alta en mostrador (atajo «N» de escritorio). */
+  const [enrollFocus, setEnrollFocus] = useState(0);
+
+  // Atajo «N»: nuevo cliente en el alta en mostrador. Solo en escritorio
+  // (en táctil el atajo no aporta). Excepción deliberada: el campo de código
+  // de tarjeta espera un token hexadecimal (public_token), así que la letra
+  // N nunca es entrada válida ahí y se puede capturar aunque tenga el foco
+  // (autoFocus). En el resto de campos de texto la N se escribe con
+  // normalidad (p. ej. buscar a «Nuria»).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!window.matchMedia("(pointer: fine)").matches) return;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== "n" && event.key !== "N") return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      const typingElsewhere =
+        target !== null &&
+        (target.isContentEditable ||
+          ["TEXTAREA", "SELECT"].includes(target.tagName) ||
+          (target.tagName === "INPUT" && target.id !== "card-code"));
+      if (typingElsewhere) return;
+      event.preventDefault();
+      setEnrollFocus((signal) => signal + 1);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
   const [busy, setBusy] = useState(false);
 
   const loadProgram = useCallback(
@@ -201,16 +237,24 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
     void search(row.public_token);
   }
 
-  async function earn() {
+  async function earn(amount?: number) {
     if (!membership) return;
     setBusy(true);
     clearFeedback();
     try {
-      const result = await fidelity.earn(merchantId, membership.id, newIdempotencyKey("earn"));
+      const result = await fidelity.earn(
+        merchantId,
+        membership.id,
+        newIdempotencyKey("earn"),
+        amount != null ? { amount } : {},
+      );
+      const isPoints = program?.program_type === "points";
       setNotice(
         result.already_applied
           ? "Esta operación ya estaba registrada (no se ha duplicado)."
-          : `Sello añadido: la tarjeta tiene ${sellos(result.stamps)}.`,
+          : isPoints
+            ? `Venta registrada: +${result.quantity} puntos · saldo ${result.stamps} puntos.`
+            : `Sello añadido: la tarjeta tiene ${sellos(result.stamps)}.`,
       );
       setMembership({ ...membership, stamps: result.stamps });
       // El selector de programas refleja el saldo al día.
@@ -288,9 +332,28 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
     ? stampSlots(membership.stamps, nextTarget ?? null)
     : { slots: 0, filled: 0 };
   const active = membership?.status === "active";
+  /** Modo puntos (§7.1): el botón de acumular pide importe, no sello. */
+  const isPoints = program?.program_type === "points";
+
+  /** Importe en euros → número con ≤2 decimales; `null` si no es válido. */
+  function parseAmount(text: string): number | null {
+    const normalized = text.trim().replace(/\s/g, "").replace(",", ".");
+    if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return null;
+    const value = Number(normalized);
+    return value >= 0.01 && value <= 10000 ? value : null;
+  }
+
+  function submitAmount(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const amount = parseAmount(amountText);
+    if (amount === null) return;
+    setAmountOpen(false);
+    setAmountText("");
+    void earn(amount);
+  }
 
   return (
-    <div className="space-y-5">
+    <div className="stagger space-y-5">
       {/* Consola de identificación: una sola entrada, botones alineados. */}
       <Panel className="animate-in">
         <div className="flex items-start justify-between gap-4">
@@ -312,6 +375,7 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
               <Input
                 id="card-code"
                 required
+                autoFocus
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
                 placeholder="Escanea el QR o pega el código"
@@ -439,6 +503,26 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
         </div>
       </details>
 
+      {/* Alta en mostrador (§13.5): el cliente nuevo se va con la tarjeta
+          funcionando, sin depender de un correo que quizá no abra hoy.
+          Atajo de escritorio «N»: nuevo cliente. */}
+      <CounterEnroll
+        merchantId={merchantId}
+        preferredProgramId={preferredProgramId}
+        onUseCard={(card) => void selectProgram(card)}
+        focusSignal={enrollFocus}
+      />
+
+      {/* «Puente mostrador»: altas del día con bienvenida en un toque
+          (sin notificaciones: sondeo de la propia consola). */}
+      {!membership && (
+        <TodayEnrollments
+          merchantId={merchantId}
+          onUseCard={(card) => void selectProgram(card)}
+          onError={(message) => setError(message)}
+        />
+      )}
+
       {error && (
         <Alert tone="danger" title="Operación no completada">
           <p>{error}</p>
@@ -446,13 +530,17 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
         </Alert>
       )}
 
-      {/* Confirmación del servidor: el recibo de la operación. */}
+      {/* Confirmación del servidor: el recibo de la operación. El sello
+          de la moneda se estampa el último, como al sellar de verdad. */}
       {notice && (
         <div
           role="status"
-          className="animate-in flex items-start gap-3 rounded-2xl border-2 border-ok/25 bg-ok-soft p-4"
+          className="animate-pop flex items-start gap-3 rounded-2xl border-2 border-ok/25 bg-ok-soft p-4"
         >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-ok text-white">
+          <span
+            aria-hidden="true"
+            className="animate-seal flex size-10 shrink-0 items-center justify-center rounded-full border-[#d99a1f] bg-[linear-gradient(145deg,#ffd985,#f7bd4b_55%,#eaa32a)] text-[#4a3208] shadow-[inset_0_1px_0_rgb(255_255_255/0.75),inset_0_-2px_3px_rgb(122_76_0/0.28),0_2px_5px_rgb(74_50_8/0.18)]"
+          >
             <IconCheck size={22} />
           </span>
           <div className="min-w-0">
@@ -483,7 +571,7 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
           <div className="border-b border-line bg-paper px-5 py-5 sm:px-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex min-w-0 items-start gap-3">
-                <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(145deg,#6a58e8,#4633b8)] text-sm font-bold text-white shadow-soft">
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl brand-tile text-sm font-bold shadow-soft">
                   {initials(membership.member_name)}
                 </span>
                 <div className="min-w-0">
@@ -514,10 +602,10 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
               </div>
               <div className="text-right">
                 <p className="tnum text-[52px] font-bold leading-none tracking-[-0.04em] text-brand">
-                  {membership.stamps}
+                  <CountUp value={membership.stamps} />
                 </p>
                 <p className="mt-1 text-xs font-semibold uppercase tracking-[0.1em] text-ink-faint">
-                  sellos
+                  {isPoints ? "puntos" : "sellos"}
                 </p>
               </div>
             </div>
@@ -552,7 +640,8 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
                             : "border-line bg-surface text-ink-soft hover:border-brand/50"
                         }`}
                       >
-                        {card.program_name ?? "Programa"} · {sellos(card.stamps)}
+                        {card.program_name ?? "Programa"} ·{" "}
+                        {unidades(card.program_type, card.stamps)}
                         {current && " ✓"}
                       </button>
                     );
@@ -563,11 +652,24 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
 
             {/* Progreso visual derivado de datos reales. */}
             <div className="mt-4 rounded-2xl border border-line bg-surface p-4">
-              <StampRow slots={progress.slots} filled={progress.filled} />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <StampRow slots={progress.slots} filled={progress.filled} />
+                {/* «Premio listo»: el momento de ofrecerlo en el mostrador. */}
+                {membership.status === "active" &&
+                  (program?.rewards ?? []).some(
+                    (reward) => reward.stamps_required <= membership.stamps,
+                  ) && (
+                    <span className="rounded-full bg-gold px-3 py-1.5 text-xs font-bold text-[#4a3208] shadow-[0_1px_3px_rgb(74_50_8/0.25)]">
+                      ⭐ Premio listo · canjéalo ahora
+                    </span>
+                  )}
+              </div>
               <p className="mt-2 text-xs text-ink-soft">
                 {nextTarget
-                  ? `Faltan ${sellos(nextTarget - membership.stamps)} para la próxima recompensa.`
-                  : "Todos los sellos acumulados están reflejados aquí."}
+                  ? `Faltan ${unidades(program?.program_type, nextTarget - membership.stamps)} para la próxima recompensa.`
+                  : isPoints
+                    ? "Todos los puntos acumulados están reflejados aquí."
+                    : "Todos los sellos acumulados están reflejados aquí."}
               </p>
             </div>
           </div>
@@ -576,20 +678,20 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
             {/* Tarjeta no activa: se dice y se bloquean las acciones. */}
             {!active && (
               <p className="mb-4 rounded-xl border border-warn/30 bg-gold-soft px-4 py-3 text-sm font-semibold text-warn">
-                Esta tarjeta está {STATUS_LABELS[membership.status] ?? membership.status} y no puede
-                sumar sellos ni canjear recompensas.
+                Esta tarjeta está {STATUS_LABELS[membership.status] ?? membership.status} y no puede{" "}
+                {isPoints ? "sumar puntos" : "sumar sellos"} ni canjear recompensas.
               </p>
             )}
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <button
                 type="button"
-                onClick={() => void earn()}
+                onClick={() => (isPoints ? setAmountOpen(true) : void earn())}
                 disabled={busy || !active}
                 className="flex min-h-16 items-center justify-center gap-2.5 rounded-2xl bg-brand text-lg font-bold text-white shadow-[0_10px_24px_-12px_rgb(91_72_214/0.8)] transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2"
               >
                 <IconCheck size={22} />
-                +1 sello (visita)
+                {isPoints ? "Registrar venta (€)" : "+1 sello (visita)"}
               </button>
 
               {program?.rewards.map((reward) => {
@@ -600,7 +702,13 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
                     type="button"
                     onClick={() => void redeem(reward.id)}
                     disabled={busy || !enough || !active}
-                    title={enough ? `Canjear por ${reward.stamps_required} sellos` : "Sellos insuficientes"}
+                    title={
+                      enough
+                        ? `Canjear por ${reward.stamps_required} ${
+                            isPoints ? (reward.stamps_required === 1 ? "punto" : "puntos") : "sellos"
+                          }`
+                        : "Saldo insuficiente"
+                    }
                     className={`flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-2xl border px-4 text-sm font-semibold transition-colors disabled:cursor-not-allowed ${
                       enough
                         ? "border-gold/40 bg-gold-soft text-warn hover:bg-gold-soft/70"
@@ -612,8 +720,8 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
                     </span>
                     {!enough && (
                       <span className="text-[11px] font-medium">
-                        Sellos insuficientes · lleva {membership.stamps} de{" "}
-                        {reward.stamps_required}
+                        {isPoints ? "Puntos insuficientes" : "Sellos insuficientes"} · lleva{" "}
+                        {membership.stamps} de {reward.stamps_required}
                       </span>
                     )}
                   </button>
@@ -665,6 +773,60 @@ export function OperationsView({ merchantId }: { merchantId: string }) {
           </div>
         </Panel>
       )}
+
+      {/* Registro de venta por importe (modo points, §7.6): el importe
+          lo teclea el personal; los puntos los calcula el backend con la
+          regla del programa y quedan en el historial con el usuario. */}
+      <Modal open={amountOpen} onClose={() => setAmountOpen(false)} title="Registrar venta">
+        <form onSubmit={submitAmount} className="space-y-4">
+          <FormField
+            label="Importe de la venta (€)"
+            required
+            hint="Máximo dos decimales. Los puntos se calculan en el servidor con la regla del programa."
+          >
+            {({ id, describedBy }) => (
+              <Input
+                id={id}
+                aria-describedby={describedBy}
+                required
+                inputMode="decimal"
+                autoComplete="off"
+                value={amountText}
+                onChange={(event) => setAmountText(event.target.value)}
+                placeholder="12,50"
+              />
+            )}
+          </FormField>
+
+          {parseAmount(amountText) !== null && program?.points_per_euro != null && (
+            <p className="rounded-xl border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink">
+              ≈ {Math.floor((parseAmount(amountText) ?? 0) * program.points_per_euro)} puntos
+              <span className="ml-1 text-xs font-normal text-ink-faint">
+                ({program.points_per_euro} por euro · redondeo hacia abajo)
+              </span>
+            </p>
+          )}
+
+          <p className="text-[11px] leading-relaxed text-ink-faint">
+            La operación queda auditada con tu usuario. Si te equivocas, se corrige con un ajuste
+            motivado desde la ficha del cliente (§7.3).
+          </p>
+
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setAmountOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              loading={busy}
+              disabled={parseAmount(amountText) === null}
+              icon={<IconCheck size={16} />}
+            >
+              Registrar venta
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   Alert,
   CopyButton,
   IconCheck,
   IconGift,
+  IconPlus,
   IconQr,
   IconWallet,
   LoadingState,
@@ -16,9 +17,10 @@ import {
 } from "@/components/ui";
 import { ApiError } from "@/lib/api";
 import { fidelity, type PublicCard, type WalletOptions } from "@/lib/fidelity";
+import { formatDateTime, formatNumber, unidades } from "@/lib/ui";
 import { nextReward } from "@/components/ui/loyalty-card";
+import { LandingCardZone } from "@/components/landing-card-zone";
 import { ArtSparkles } from "@/components/ui/art";
-import { sellos } from "@/lib/ui";
 
 /** Cada cuánto se comprueba si el saldo o el estado cambiaron (ms). */
 const REFRESH_MS = 10_000;
@@ -37,10 +39,36 @@ export function CardView({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   /** Estado no operativo (suspendida/revocada): se muestra y puede revertirse. */
   const [inactive, setInactive] = useState<string | null>(null);
+  /** Último saldo conocido: detecta sellos nuevos para estamparlos. */
+  const previousStamps = useRef<number | null>(null);
+  /** Índice del primer sello recién ganado (se limpia tras la animación). */
+  const [freshFrom, setFreshFrom] = useState<number | null>(null);
+  /** Recompensa recién alcanzada: celebración de una sola vez. */
+  const [celebrate, setCelebrate] = useState<string | null>(null);
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
       const data = await fidelity.publicCard(token);
+      // Detección de novedades: solo en transiciones (nunca en la primera
+      // carga), para no celebrar lo que ya era así al abrir la página.
+      const previous = previousStamps.current;
+      if (previous !== null && data.stamps > previous) {
+        setFreshFrom(previous);
+        window.setTimeout(() => setFreshFrom(null), 2200);
+        // Al cruzar el umbral la recompensa ya figura como ganada: el cruce
+        // se calcula por los saldos anterior y nuevo, no por `earned`.
+        const crossed = [...data.rewards]
+          .sort((a, b) => a.stamps_required - b.stamps_required)
+          .find(
+            (reward) =>
+              previous < reward.stamps_required && reward.stamps_required <= data.stamps,
+          );
+        if (crossed) {
+          setCelebrate(crossed.name);
+          window.setTimeout(() => setCelebrate(null), 7000);
+        }
+      }
+      previousStamps.current = data.stamps;
       setCard(data);
       setInactive(null);
       setError(null);
@@ -123,10 +151,12 @@ export function CardView({ token }: { token: string }) {
 
   const { reward: next, remaining } = nextReward(card.stamps, card.rewards);
   const hasRealWallet = Boolean(wallet && !wallet.simulated && wallet.actions.length > 0);
+  /** iPhone sin Wallet real: la pantalla de inicio es la vía honrada. */
+  const isIos = typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent);
 
   return (
     <main className="relative mx-auto max-w-lg px-4 pb-12 pt-5 sm:px-6 sm:pt-7">
-      <ArtSparkles className="pointer-events-none absolute -top-1 right-3 h-12 w-12 opacity-60" />
+      <ArtSparkles className="animate-twinkle pointer-events-none absolute -top-1 right-3 h-12 w-12 opacity-60" />
       <header className="animate-in mb-4 flex items-end justify-between gap-3">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-brand">
@@ -142,18 +172,79 @@ export function CardView({ token }: { token: string }) {
         </span>
       </header>
 
-      {/* La tarjeta real del cliente, con sus datos confirmados por el backend. */}
+      {/* La tarjeta real del cliente, con sus datos confirmados por el backend.
+          La inclinación 3D es cortesía del puntero: no afecta al contenido ni
+          funciona en táctil ni con movimiento reducido. Los sellos que acaban
+          de entrar se estampan solos, como en la tienda. */}
       <div className="animate-in">
-        <LoyaltyCard
-          merchantName={card.merchant_name}
-          programName={card.program_name}
-          stamps={card.stamps}
-          rewards={card.rewards}
-          holderName={null}
-          variant="card"
-          stampsTestId="card-stamps"
-        />
+        <LandingCardZone>
+          <div className="tilt-stage" style={{ transformStyle: "preserve-3d" }}>
+            <LoyaltyCard
+              merchantName={card.merchant_name}
+              programName={card.program_name}
+              stamps={card.stamps}
+              rewards={card.rewards}
+              holderName={null}
+              variant="card"
+              stampsTestId="card-stamps"
+              stampAnimateFrom={freshFrom}
+              programType={card.program_type}
+              branding={
+                card.primary_color
+                  ? {
+                      primary_color: card.primary_color,
+                      accent_color: card.accent_color ?? "#f7bd4b",
+                      stamp_icon: card.stamp_icon ?? "cup",
+                      footer_text: card.footer_text ?? null,
+                      logo_url: card.logo_url ?? null,
+                    }
+                  : null
+              }
+            />
+          </div>
+        </LandingCardZone>
       </div>
+
+      {/* Recompensa recién alcanzada: una sola vez, al cruzar el umbral. */}
+      {celebrate && (
+        <div
+          role="status"
+          className="animate-pop relative mt-4 overflow-hidden rounded-2xl border-2 border-gold/40 bg-gold-soft p-4"
+        >
+          <ArtSparkles className="animate-twinkle pointer-events-none absolute -right-1 -top-2 h-10 w-10 opacity-80" />
+          <div className="flex items-start gap-3">
+            <span
+              aria-hidden="true"
+              className="flex size-10 shrink-0 items-center justify-center rounded-full border-[#d99a1f] bg-[linear-gradient(145deg,#ffd985,#f7bd4b_55%,#eaa32a)] text-[#4a3208] shadow-[inset_0_1px_0_rgb(255_255_255/0.75),inset_0_-2px_3px_rgb(122_76_0/0.28),0_2px_5px_rgb(74_50_8/0.18)]"
+            >
+              <IconGift size={20} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-gold">
+                ¡Recompensa conseguida!
+              </p>
+              <p className="mt-0.5 text-[15px] font-bold leading-snug text-ink">
+                Ya puedes pedir «{celebrate}» en caja.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sin Wallet real y en iPhone: la alternativa honrada es la pantalla
+          de inicio. Detalle discreto, con las instrucciones exactas. */}
+      {hasRealWallet === false && isIos && (
+        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-line bg-paper p-4">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+            <IconPlus size={17} />
+          </span>
+          <p className="text-xs leading-relaxed text-ink-soft">
+            <strong className="font-semibold text-ink">Guárdala siempre a mano:</strong> toca el
+            botón de compartir de Safari y elige «Añadir a pantalla de inicio». La abrirás con un
+            toque, como una app.
+          </p>
+        </div>
+      )}
 
       {/* Próximo paso real: cuánto falta para la siguiente recompensa. */}
       <div className="mt-4 flex items-start gap-3 rounded-2xl border border-line bg-surface p-4 shadow-soft">
@@ -163,18 +254,43 @@ export function CardView({ token }: { token: string }) {
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink">
             {next
-              ? `Te faltan ${sellos(remaining)} para «${next.name}»`
+              ? `Te faltan ${unidades(card.program_type, remaining)} para «${next.name}»`
               : card.rewards.length
                 ? "Tienes recompensas disponibles: pídelas en caja"
-                : "Sigue sumando sellos en cada visita"}
+                : card.program_type === "points"
+                  ? "Sigue sumando puntos con cada venta"
+                  : "Sigue sumando sellos en cada visita"}
           </p>
           <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
             {next
-              ? "El personal confirma cada sello desde el mostrador. Tu saldo real es el que ves aquí."
+              ? card.program_type === "points"
+                ? "El personal registra cada venta desde el mostrador. Tu saldo real es el que ves aquí."
+                : "El personal confirma cada sello desde el mostrador. Tu saldo real es el que ves aquí."
               : "El saldo de esta tarjeta lo confirma siempre el servidor del comercio."}
           </p>
         </div>
       </div>
+
+      {/* Condición de caducidad del programa (§7.7): visible en la propia
+          tarjeta para que nadie sorprenda con sellos que vencen. Los
+          puntos por importe no caducan (§7.6). */}
+      {card.stamps_expire_days != null && card.program_type !== "points" && (
+        <p className="mt-2 rounded-xl border border-gold/60 bg-gold-soft px-3 py-2 text-[11px] font-semibold text-warn">
+          ⏳ Tus sellos caducan a los {card.stamps_expire_days} días de obtenerse.
+        </p>
+      )}
+
+      {/* Tu registro (§9.3: solo agregados, sin importes ni detalle). El
+          cliente ve que el servidor recuerda sus visitas: confianza y menos
+          disputas en caja. Se muestra solo cuando hay visitas. */}
+      {(card.total_visits ?? 0) > 0 && (
+        <p className="mt-2 text-xs text-ink-faint">
+          {card.total_visits === 1
+            ? "1 visita registrada en esta tarjeta."
+            : `${formatNumber(card.total_visits ?? 0)} visitas registradas en esta tarjeta.`}
+          {card.last_visit_at && ` Última: ${formatDateTime(card.last_visit_at)}.`}
+        </p>
+      )}
 
       {/* Wallet: solo acciones reales del proveedor; nunca falsas promesas. */}
       <section className="mt-4 space-y-2" aria-label="Opciones de Wallet">
@@ -201,9 +317,10 @@ export function CardView({ token }: { token: string }) {
           )}
 
         {card.simulated_wallet && (
-          <Alert tone="warn" title="Tarjeta web activa · Modo de demostración">
-            Funciona desde el navegador. La integración con Apple Wallet y Google Wallet aún no está
-            configurada: todavía no se ha emitido un pase real en ninguna de las dos.
+          <Alert tone="warn" title="Añadir a Wallet · No disponible de momento">
+            De momento tu tarjeta vive aquí, en el navegador: funciona igual para
+            acumular y canjear. Apple Wallet y Google Wallet llegarán más
+            adelante; te avisará tu comercio cuando estén.
           </Alert>
         )}
       </section>
@@ -216,7 +333,11 @@ export function CardView({ token }: { token: string }) {
               <IconQr size={18} />
             </span>
             <div>
-              <p className="text-sm font-bold text-ink">Muéstralo en caja para acumular sellos</p>
+              <p className="text-sm font-bold text-ink">
+                {card.program_type === "points"
+                  ? "Muéstralo en caja para acumular puntos"
+                  : "Muéstralo en caja para acumular sellos"}
+              </p>
               <p className="text-[11px] text-ink-faint">El personal lo escanea con su móvil</p>
             </div>
           </div>
@@ -269,7 +390,7 @@ export function CardView({ token }: { token: string }) {
                     item.earned ? "bg-gold text-white" : "bg-surface-2 text-ink-soft"
                   }`}
                 >
-                  {item.earned ? "Canjeable" : sellos(item.stamps_required)}
+                  {item.earned ? "Canjeable" : unidades(card.program_type, item.stamps_required)}
                 </span>
               </li>
             ))}

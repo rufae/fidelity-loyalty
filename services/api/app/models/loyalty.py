@@ -1,8 +1,12 @@
 """Programas de fidelización y recompensas (AGENTS.md §7, §11.5, §11.6).
 
-FASE 3: tipo `stamps` (sellos por visita). El modo `points` queda **pospuesto
-expresamente** (§7.1): añade reglas de redondeo, importes y moneda que deben
-diseñarse con calma; el esquema no lo impide (`program_type` es un string).
+Dos tipos operativos (§7.1, mejora de compra #9):
+
+- `stamps`: sellos enteros por visita (el flujo original).
+- `points`: puntos por importe de la venta. El importe lo teclea el
+  personal en el mostrador (MVP sin TPV, §7.6) y **el backend** calcula
+  los puntos con `points_per_euro` en aritmética Decimal: nunca flotantes
+  ni cantidades enviadas por el navegador (§7.6, §11.19).
 """
 
 import uuid
@@ -26,6 +30,7 @@ class ProgramStatus:
 
 class ProgramType:
     STAMPS = "stamps"
+    POINTS = "points"
 
 
 class LoyaltyProgram(Base):
@@ -46,6 +51,15 @@ class LoyaltyProgram(Base):
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Caducidad opcional de sellos (decisión de compra #6, §7.7): días
+    #: que tarda cada lote de sellos en vencer. `None` = sin caducidad,
+    #: que sigue siendo el comportamiento por defecto. Solo afecta a los
+    #: `earn` futuros: los lotes ya emitidos conservan su fecha.
+    stamps_expire_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Regla del modo `points` (§7.6): puntos enteros por euro gastado.
+    #: `None` = sin regla (obligatoria antes de publicar un programa de
+    #: puntos). El redondeo es siempre hacia abajo, en el backend.
+    points_per_euro: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     @property
     def is_active(self) -> bool:

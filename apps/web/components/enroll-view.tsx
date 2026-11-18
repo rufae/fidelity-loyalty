@@ -54,7 +54,6 @@ export function EnrollView({
   const [name, setName] = useState("");
   const [accepted, setAccepted] = useState(false);
   const [privacy, setPrivacy] = useState(false);
-  const [marketing, setMarketing] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -84,7 +83,6 @@ export function EnrollView({
         display_name: name,
         accepted_terms_version: program.terms_version,
         privacy_notice_version: program.privacy_notice_version,
-        marketing_consent: marketing,
       });
       setConfirmationSent(true);
     } catch (err) {
@@ -99,6 +97,11 @@ export function EnrollView({
       setBusy(false);
     }
   }
+
+  /** El premio más alcanzable: lo que el cliente persigue desde hoy. */
+  const firstReward = program?.rewards
+    ?.slice()
+    .sort((a, b) => a.stamps_required - b.stamps_required)[0];
 
   if (error && !program) {
     return (
@@ -125,7 +128,15 @@ export function EnrollView({
       <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-5 py-14">
         <div className="animate-in overflow-hidden rounded-3xl border border-line bg-surface shadow-lift">
           <div className="mesh-brand grain relative px-7 py-8 text-center text-white">
-            <ArtSparkles className="pointer-events-none absolute right-5 top-4 h-10 w-10 opacity-80 sm:h-12 sm:w-12" />
+            <div
+              aria-hidden="true"
+              className="animate-drift pointer-events-none absolute -left-14 -top-16 size-56 rounded-full bg-brand-glow/30 blur-3xl"
+            />
+            <div
+              aria-hidden="true"
+              className="animate-drift pointer-events-none absolute -bottom-20 -right-10 size-48 rounded-full bg-gold-bright/15 blur-3xl [animation-delay:-5s]"
+            />
+            <ArtSparkles className="animate-twinkle pointer-events-none absolute right-5 top-4 h-10 w-10 opacity-80 sm:h-12 sm:w-12" />
             <span className="relative mx-auto flex size-16 items-center justify-center rounded-2xl border border-white/25 bg-white/15 text-white backdrop-blur-sm">
               <IconMail size={30} />
             </span>
@@ -136,7 +147,7 @@ export function EnrollView({
             </p>
           </div>
           <div className="space-y-4 p-6">
-            <ol className="space-y-3">
+            <ol className="stagger space-y-3">
               {[
                 "Abre el correo que te acabamos de enviar.",
                 "Pulsa el enlace de confirmación.",
@@ -150,6 +161,15 @@ export function EnrollView({
                 </li>
               ))}
             </ol>
+            {/* Refuerzo del premio (mejora «Premio listo»): el cliente sabe
+                qué persigue y sabe qué hacer cuando lo consiga. */}
+            {firstReward && (
+              <p className="rounded-xl bg-gold-soft p-3 text-sm leading-relaxed text-warn">
+                <strong className="font-bold">Llega a {sellos(firstReward.stamps_required)}</strong>{" "}
+                y consigue <strong className="font-bold">{firstReward.name}</strong>. Cuando lo
+                tengas, enséñanos tu tarjeta en el mostrador y lo estampamos.
+              </p>
+            )}
             <p className="rounded-xl bg-surface-2 p-3 text-xs leading-relaxed text-ink-soft">
               El enlace de confirmación caduca en 30 minutos. Si no llega, revisa la carpeta de
               correo no deseado. Puedes cerrar esta pestaña.
@@ -164,6 +184,15 @@ export function EnrollView({
     <main className="mx-auto max-w-lg px-4 pb-12 pt-4 sm:px-6 sm:pt-6">
       {/* Héroe del programa: identidad del comercio y qué se lleva el cliente. */}
       <header className="mesh-brand grain animate-in relative overflow-hidden rounded-3xl p-6 text-white shadow-lift sm:p-7">
+        {/* Auroras: la misma luz cálida que la portada, sobria para el alta. */}
+        <div
+          aria-hidden="true"
+          className="animate-drift pointer-events-none absolute -left-16 -top-20 size-64 rounded-full bg-brand-glow/30 blur-3xl"
+        />
+        <div
+          aria-hidden="true"
+          className="animate-drift pointer-events-none absolute -right-16 bottom-[-30%] size-56 rounded-full bg-gold-bright/15 blur-3xl [animation-delay:-6s]"
+        />
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -right-12 -top-12 size-40 rounded-full border border-white/15"
@@ -312,6 +341,22 @@ export function EnrollView({
             </div>
           )}
 
+          {/* Caducidad si el comercio la define: se informa ANTES del
+              registro, junto a las condiciones (§7.7, §13.4). */}
+          {program.stamps_expire_days != null && program.program_type !== "points" && (
+            <p className="rounded-xl border border-gold/60 bg-gold-soft px-4 py-3 text-xs font-semibold text-warn">
+              ⏳ Los sellos caducan a los {program.stamps_expire_days} días de obtenerse.
+            </p>
+          )}
+
+          {/* Regla de puntos por euro (§7.6): explicada antes del alta. */}
+          {program.program_type === "points" && program.points_per_euro != null && (
+            <p className="rounded-xl border border-gold/60 bg-gold-soft px-4 py-3 text-xs font-semibold text-warn">
+              💰 Ganas {program.points_per_euro}{" "}
+              {program.points_per_euro === 1 ? "punto" : "puntos"} por cada euro que gastes.
+            </p>
+          )}
+
           <div className="space-y-2">
             <Checkbox
               required
@@ -328,12 +373,10 @@ export function EnrollView({
               description="Tus datos (nombre y email) se usan solo para gestionar esta tarjeta."
             />
 
-            <Checkbox
-              checked={marketing}
-              onChange={(e) => setMarketing(e.target.checked)}
-              label="Quiero recibir novedades del establecimiento."
-              description="Opcional; puedes retirarlo cuando quieras."
-            />
+            {/* Sin casilla de novedades: el MVP no tiene canal de envío
+                (§9.6) y prometer algo que no se envía es engañoso. Se
+                activará cuando exista un canal real, con consentimiento
+                separado y prueba de opt-in. */}
           </div>
 
           {error && (

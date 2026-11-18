@@ -12,10 +12,11 @@ import io
 import logging
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -42,9 +43,24 @@ AdminDep = Annotated[object, Depends(merchant_admin)]
 
 
 class EarnRequest(BaseModel):
-    quantity: int = Field(default=1, ge=1, le=20)
+    #: Modo sellos: unidades por visita (1–20). Omitido = 1.
+    quantity: int | None = Field(default=None, ge=1, le=20)
+    #: Modo puntos (§7.6): importe de la venta en euros, hasta dos
+    #: decimales. Los puntos los calcula el backend con la regla del
+    #: programa: el navegador jamás envía la cantidad a otorgar.
+    amount: Decimal | None = Field(default=None, ge=Decimal("0.01"), le=Decimal("10000"))
     idempotency_key: str = Field(min_length=8, max_length=120)
     reason: str | None = Field(default=None, max_length=255)
+
+    @field_validator("amount")
+    @classmethod
+    def _two_decimals(cls, value: Decimal | None) -> Decimal | None:
+        """Importes con máximo dos decimales: nada de fracciones raras."""
+        if value is None:
+            return None
+        if value != value.quantize(Decimal("0.01")):
+            raise ValueError("máximo dos decimales")
+        return value
 
 
 class RedeemRequest(BaseModel):
@@ -145,11 +161,18 @@ def earn(
         membership_id,
         merchant_id,
         quantity=data.quantity,
+        amount=data.amount,
         idempotency_key=data.idempotency_key,
         actor_user_id=context.user.id,  # type: ignore[attr-defined]
         reason=data.reason,
     )
     if not result.already_applied:
+        audit_meta: dict[str, str] = {}
+        if data.reason:
+            audit_meta["reason"] = data.reason
+        if data.amount is not None:
+            # Importe de la venta registrado en auditoría (§8.4): sin PII.
+            audit_meta["amount_eur"] = str(data.amount)
         record_audit(
             session,
             action="loyalty.earn",
@@ -157,7 +180,7 @@ def earn(
             actor_id=context.user.id,  # type: ignore[attr-defined]
             merchant_id=merchant_id,
             entity_id=str(membership_id),
-            metadata={"reason": data.reason} if data.reason else None,
+            metadata=audit_meta or None,
         )
         # El sello se confirma en base de datos ANTES de tocar Wallet: un
         # fallo del proveedor nunca puede deshacer la operación del ledger

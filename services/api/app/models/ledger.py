@@ -24,6 +24,9 @@ class TransactionType:
     REDEEM = "redeem"
     ADJUSTMENT = "adjustment"
     REVERSAL = "reversal"
+    #: Sellos vencidos según la regla opcional del programa (§7.7): genera
+    #: un movimiento negativo auditable; nunca se borran earn históricos.
+    EXPIRY = "expiry"
 
 
 class LoyaltyTransaction(Base):
@@ -44,6 +47,11 @@ class LoyaltyTransaction(Base):
     related_transaction_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    #: Fecha de caducidad del lote de sellos (decisión de compra #6):
+    #: solo en `earn` cuando el programa define `stamps_expire_days`.
+    #: `None` = el lote no caduca. El vencimiento se materializa como un
+    #: movimiento `expiry` aparte; este campo nunca se edita.
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class RewardRedemption(Base):

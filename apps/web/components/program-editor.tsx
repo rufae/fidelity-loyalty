@@ -40,7 +40,7 @@ const STATUS_TONE: Record<string, "neutral" | "ok" | "warn"> = {
 
 const EDITOR_STEPS = [
   { title: "Información", description: "Nombre y descripción" },
-  { title: "Condiciones", description: "Texto que acepta el cliente" },
+  { title: "Condiciones", description: "Texto y caducidad" },
   { title: "Recompensas", description: "Sellos necesarios" },
   { title: "Publicar", description: "Abrir el alta pública" },
 ];
@@ -202,6 +202,82 @@ export function ProgramEditor({
                   />
                 )}
               </SaveableField>
+
+              {/* Caducidad opcional (§7.7): sin regla por defecto. Solo
+                  afecta a sellos futuros y el cliente la ve antes del alta.
+                  Los puntos no caducan: en modo points no se ofrece. */}
+              {program.program_type !== "points" && (
+                <SaveableField
+                  label="Caducidad de sellos"
+                  optional
+                  hint="Opcional: días hasta que caduca cada sello nuevo (1–3650). Vacío = sin caducidad. Los sellos ya acumulados no cambian. El cliente verá la condición en la página de alta y en su tarjeta."
+                  initialValue={
+                    program.stamps_expire_days != null ? String(program.stamps_expire_days) : ""
+                  }
+                  savedMessage="Caducidad actualizada"
+                  onSave={(value) => {
+                    const trimmed = value.trim();
+                    if (trimmed === "") {
+                      return fidelity.updateProgram(merchantId, programId, {
+                        stamps_expire_days: null,
+                      });
+                    }
+                    const days = Number(trimmed);
+                    if (!Number.isInteger(days) || days < 1 || days > 3650) {
+                      return Promise.reject(new Error("Caducidad fuera de rango (1–3650 días)"));
+                    }
+                    return fidelity.updateProgram(merchantId, programId, {
+                      stamps_expire_days: days,
+                    });
+                  }}
+                >
+                  {(field) => (
+                    <Input
+                      {...field}
+                      type="number"
+                      min={1}
+                      max={3650}
+                      inputMode="numeric"
+                      defaultValue={program.stamps_expire_days ?? ""}
+                      placeholder="Sin caducidad"
+                      className="max-w-44"
+                    />
+                  )}
+                </SaveableField>
+              )}
+
+              {/* Regla del modo puntos (§7.6): el importe lo teclea el
+                  mostrador y el backend calcula con este entero. */}
+              {program.program_type === "points" && (
+                <SaveableField
+                  label="Puntos por euro"
+                  hint="Entero entre 1 y 1000. Los puntos los calcula el backend por importe de venta, redondeando hacia abajo (§7.6). El cliente verá la regla en la página de alta."
+                  initialValue={
+                    program.points_per_euro != null ? String(program.points_per_euro) : ""
+                  }
+                  savedMessage="Regla de puntos actualizada"
+                  onSave={(value) => {
+                    const rate = Number(value.trim());
+                    if (!Number.isInteger(rate) || rate < 1 || rate > 1000) {
+                      return Promise.reject(new Error("Regla fuera de rango (1–1000)"));
+                    }
+                    return fidelity.updateProgram(merchantId, programId, { points_per_euro: rate });
+                  }}
+                >
+                  {(field) => (
+                    <Input
+                      {...field}
+                      type="number"
+                      min={1}
+                      max={1000}
+                      step={1}
+                      defaultValue={program.points_per_euro ?? ""}
+                      placeholder="1"
+                      className="max-w-44"
+                    />
+                  )}
+                </SaveableField>
+              )}
             </div>
           </Panel>
 
@@ -363,9 +439,10 @@ export function ProgramEditor({
               rewards={program.rewards}
               holderName="Así la verá el cliente"
               variant="card"
+              programType={program.program_type}
             />
             <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
-              Los sellos empiezan en 0 al darse de alta. Esta vista usa solo los datos reales del
+              El saldo empieza en 0 al darse de alta. Esta vista usa solo los datos reales del
               programa.
             </p>
           </div>
@@ -388,6 +465,20 @@ export function ProgramEditor({
                 {program.terms}
               </p>
             </Panel>
+          )}
+
+          {program.stamps_expire_days != null && program.program_type !== "points" && (
+            <p className="rounded-xl border border-line bg-gold-soft px-3 py-2 text-[11px] font-semibold text-warn">
+              Los sellos caducan a los {program.stamps_expire_days} días de obtenerse · El cliente
+              verá esta condición en el alta y en su tarjeta.
+            </p>
+          )}
+
+          {program.program_type === "points" && (
+            <p className="rounded-xl border border-line bg-gold-soft px-3 py-2 text-[11px] font-semibold text-warn">
+              {program.points_per_euro ?? "—"} {program.points_per_euro === 1 ? "punto" : "puntos"}{" "}
+              por euro gastado · el cliente verá la regla en la página de alta.
+            </p>
           )}
 
           <p className="rounded-xl border border-line bg-surface p-3 text-[11px] leading-relaxed text-ink-faint">
