@@ -27,7 +27,9 @@ describe("stampSlots: progreso derivado solo de datos reales", () => {
   it("usa el umbral de la próxima recompensa como objetivo", () => {
     const { slots, filled } = stampSlots(12, 15);
     expect(slots).toBe(12); // 15 se recorta al máximo de 12 huecos
-    expect(filled).toBe(12);
+    // Proporción honesta: 12 de 15 = 80 % → 10 de 12 huecos, no «lleno»
+    // (la barra llena contradeciría el «faltan 3» de debajo).
+    expect(filled).toBe(10);
   });
 
   it("sin recompensas muestra 10 huecos como referencia visual", () => {

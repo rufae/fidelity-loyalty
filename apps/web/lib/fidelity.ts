@@ -11,10 +11,16 @@ export interface Program {
   description: string | null;
   terms: string | null;
   terms_version: number;
+  /** Versión del aviso de privacidad que acredita el alta (ADR-0006). */
+  privacy_notice_version?: number;
   status: string;
   created_at: string;
   updated_at: string;
   published_at: string | null;
+  /** Caducidad opcional de sellos en días (§7.7); `null` = sin regla. */
+  stamps_expire_days?: number | null;
+  /** Regla del modo puntos (§7.6): puntos enteros por euro. */
+  points_per_euro?: number | null;
 }
 
 export interface Reward {
@@ -30,6 +36,12 @@ export interface ProgramDetail extends Program {
   rewards: Reward[];
 }
 
+/** Resultado del alta en mostrador: tarjeta lista o la que ya tenía. */
+export interface ManualEnrollResult {
+  membership: Membership;
+  created: boolean;
+}
+
 export interface Membership {
   id: string;
   member_id: string;
@@ -38,6 +50,8 @@ export interface Membership {
   status: string;
   stamps: number;
   joined_at: string;
+  /** Tipo del programa (§7.1): `stamps` o `points`, para rotular la UI. */
+  program_type?: string | null;
   /** Nombre del programa (promoción) al que pertenece la tarjeta. */
   program_name?: string | null;
   /** Identidad mínima del cliente para localizarlo en el mostrador (§13.5). */
@@ -48,6 +62,20 @@ export interface Membership {
   status_changed_at?: string | null;
   deletion_requested_at?: string | null;
   anonymized_at?: string | null;
+  /** Premio al alcance (mejora «Premio listo»): derivado del backend. */
+  next_reward_name?: string | null;
+  next_reward_remaining?: number | null;
+  reward_ready?: boolean;
+}
+
+/** Página del listado de tarjetas (§12.1): items + contadores reales. */
+export interface MembershipPage {
+  items: Membership[];
+  total: number;
+  active: number;
+  suspended: number;
+  /** Tarjetas con recompensa activa ya alcanzable (chip «Premio listo»). */
+  ready: number;
 }
 
 export interface PublicProgram {
@@ -63,6 +91,11 @@ export interface PublicProgram {
   terms_version: number;
   rewards: { name: string; description: string | null; stamps_required: number }[];
   enrollment_open: boolean;
+  /** Caducidad de sellos si el comercio la define: el alta la comunica
+      antes de registrar al cliente (§7.7, §13.4). */
+  stamps_expire_days?: number | null;
+  /** Regla de puntos por euro si el programa es de puntos (§7.6). */
+  points_per_euro?: number | null;
 }
 
 export interface WalletAction {
@@ -88,6 +121,27 @@ export interface PublicCard {
   rewards: { name: string; stamps_required: number; earned: boolean }[];
   wallet_options: string[];
   simulated_wallet: boolean;
+  /** Caducidad de sellos si el programa la define (§7.7): la tarjeta la
+      muestra junto al saldo para no prometer sellos que vencerán. */
+  stamps_expire_days?: number | null;
+  /** Registro propio del cliente: visitas totales y última (§9.3). */
+  total_visits?: number;
+  last_visit_at?: string | null;
+  /** Diseño del comercio (decisión #8): presentación de la tarjeta. */
+  primary_color?: string;
+  accent_color?: string;
+  stamp_icon?: string;
+  footer_text?: string | null;
+  logo_url?: string | null;
+}
+
+/** Diseño de tarjeta del comercio (§11.15): colores, icono, pie y logo. */
+export interface CardBranding {
+  primary_color: string;
+  accent_color: string;
+  stamp_icon: string;
+  footer_text: string | null;
+  logo_url: string | null;
 }
 
 export interface NfcTag {
@@ -133,6 +187,18 @@ export interface NfcStats {
   tags_active: number;
 }
 
+/** Trabajo asíncrono de Wallet (§15): estados persistidos y reintenable. */
+export interface WalletJob {
+  id: string;
+  job_type: string;
+  status: string;
+  attempts: number;
+  error_code: string | null;
+  error_detail: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
 export interface DashboardSummary {
   members_total: number;
   memberships_active: number;
@@ -142,6 +208,85 @@ export interface DashboardSummary {
   wallet_passes: number;
   wallet_errors: number;
   review_link_clicks: number;
+}
+
+/** Cierre de turno (§13.2): lo que ha pasado HOY en el comercio. */
+export interface DashboardToday {
+  local_date: string;
+  enrolled_today: number;
+  stamps_today: number;
+  redeemed_stamps_today: number;
+  redemptions_today: number;
+}
+
+/** Primeros pasos del comercio nuevo (mejora de onboarding, §13.2):
+    cuatro puertas hasta el primer sello, derivadas del backend. */
+export interface DashboardOnboarding {
+  /** Programa publicado con al menos una recompensa activa. */
+  program_ready: boolean;
+  /** Al menos una tienda registrada. */
+  store_ready: boolean;
+  /** QR/NFC de alta activo para que el cliente se dé de alta. */
+  qr_ready: boolean;
+  /** Primer cliente registrado en el programa. */
+  first_member: boolean;
+  completed: boolean;
+}
+
+/** Serie diaria de operaciones para la gráfica de tendencia (§13.2). */
+export interface LoyaltySeriesPoint {
+  day: string;
+  transaction_type: string;
+  count: number;
+}
+
+export interface LoyaltySeries {
+  period_days: number;
+  series: LoyaltySeriesPoint[];
+}
+
+/** Plan contratado y su uso real (cifras del backend, §13.2). */
+export interface PlanUsage {
+  plan: string;
+  plan_name: string;
+  max_locations: number;
+  locations: number;
+  max_active_programs: number;
+  active_programs: number;
+  max_staff: number;
+  staff: number;
+}
+
+/** Usuario del comercio (propietario, admin o staff, §8.1). */
+export interface MerchantUser {
+  id: string;
+  user_id: string;
+  email: string;
+  display_name: string;
+  role: string;
+  status: string;
+  created_at: string;
+}
+
+/** Tienda del comercio (§11.3). */
+export interface MerchantLocation {
+  id: string;
+  name: string;
+  address: string | null;
+  status: string;
+  created_at: string;
+}
+
+/** Catálogo público de planes y precios (página /precios). */
+export interface PublicPlan {
+  code: string;
+  name: string;
+  tagline: string;
+  price_month_eur: number;
+  price_year_eur: number;
+  max_locations: number;
+  max_active_programs: number;
+  max_staff: number;
 }
 
 export interface TransactionRow {
@@ -166,7 +311,61 @@ const base = (merchantId: string) => `/api/v1/merchants/${merchantId}`;
 
 export const fidelity = {
   programs: (merchantId: string) => apiFetch<Program[]>(`${base(merchantId)}/programs`),
-  createProgram: (merchantId: string, body: { name: string; description?: string; terms?: string }) =>
+  /** Plan contratado y su uso (cifras reales del backend). */
+  planUsage: (merchantId: string) => apiFetch<PlanUsage>(`${base(merchantId)}/plan`),
+  locations: (merchantId: string) =>
+    apiFetch<MerchantLocation[]>(`${base(merchantId)}/locations`),
+  createLocation: (merchantId: string, body: { name: string; address?: string }) =>
+    apiFetch<MerchantLocation>(`${base(merchantId)}/locations`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  setLocationStatus: (merchantId: string, locationId: string, status: "active" | "inactive") =>
+    apiFetch<MerchantLocation>(`${base(merchantId)}/locations/${locationId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+  /** Equipo del comercio (§12.3): el dueño crea sus empleados. */
+  users: (merchantId: string) => apiFetch<MerchantUser[]>(`${base(merchantId)}/users`),
+  createUser: (
+    merchantId: string,
+    body: { email: string; password: string; display_name: string; role: string },
+  ) =>
+    apiFetch<MerchantUser>(`${base(merchantId)}/users`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  setUserStatus: (merchantId: string, userId: string, status: "active" | "disabled") =>
+    apiFetch<MerchantUser>(`${base(merchantId)}/users/${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+  /** Alta en mostrador (§13.5): el personal crea la tarjeta en el local. */
+  manualEnroll: (
+    merchantId: string,
+    body: {
+      program_id: string;
+      display_name: string;
+      email?: string;
+      accepted_terms_version: number;
+      privacy_notice_version: number;
+    },
+  ) =>
+    apiFetch<ManualEnrollResult>(`${base(merchantId)}/memberships`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  createProgram: (
+    merchantId: string,
+    body: {
+      name: string;
+      description?: string;
+      terms?: string;
+      stamps_expire_days?: number | null;
+      program_type?: "stamps" | "points";
+      points_per_euro?: number | null;
+    },
+  ) =>
     apiFetch<ProgramDetail>(`${base(merchantId)}/programs`, {
       method: "POST",
       body: JSON.stringify(body),
@@ -192,10 +391,20 @@ export const fidelity = {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  memberships: (merchantId: string, q?: string) =>
-    apiFetch<Membership[]>(
-      `${base(merchantId)}/memberships${q ? `?q=${encodeURIComponent(q)}` : ""}`,
-    ),
+  /** Página de tarjetas: `q` filtra, `ready` aplica el chip «Premio listo»
+      y los contadores de la cabecera llegan con la misma respuesta. */
+  memberships: (
+    merchantId: string,
+    options?: { q?: string; ready?: boolean; limit?: number; offset?: number },
+  ) => {
+    const params = new URLSearchParams();
+    if (options?.q) params.set("q", options.q);
+    if (options?.ready) params.set("ready", "true");
+    if (options?.limit) params.set("limit", String(options.limit));
+    if (options?.offset) params.set("offset", String(options.offset));
+    const query = params.toString();
+    return apiFetch<MembershipPage>(`${base(merchantId)}/memberships${query ? `?${query}` : ""}`);
+  },
   /** Búsqueda por nombre/correo del cliente para el mostrador (§13.5):
       en backend queda registrada en la auditoría. */
   searchCards: (merchantId: string, q: string) =>
@@ -208,10 +417,29 @@ export const fidelity = {
       method: "POST",
       body: JSON.stringify({ token }),
     }),
-  earn: (merchantId: string, membershipId: string, idempotencyKey: string, quantity = 1) =>
-    apiFetch<OperationResult>(`${base(merchantId)}/memberships/${membershipId}/earn`, {
+  /** Acumula en el mostrador: `quantity` (1–20) en modo sellos o
+      `amount` (euros) en modo puntos — la cantidad de puntos la calcula
+      el backend con la regla del programa (§7.6). */
+  earn: (
+    merchantId: string,
+    membershipId: string,
+    idempotencyKey: string,
+    options?: { quantity?: number; amount?: number },
+  ) => {
+    const body =
+      options?.amount != null
+        ? { amount: options.amount, idempotency_key: idempotencyKey }
+        : { quantity: options?.quantity ?? 1, idempotency_key: idempotencyKey };
+    return apiFetch<OperationResult>(`${base(merchantId)}/memberships/${membershipId}/earn`, {
       method: "POST",
-      body: JSON.stringify({ quantity, idempotency_key: idempotencyKey }),
+      body: JSON.stringify(body),
+    });
+  },
+  /** Ajuste manual con motivo obligatorio (§7.3): solo administración. */
+  adjust: (merchantId: string, membershipId: string, delta: number, reason: string) =>
+    apiFetch<OperationResult>(`${base(merchantId)}/memberships/${membershipId}/adjust`, {
+      method: "POST",
+      body: JSON.stringify({ delta, reason }),
     }),
   redeem: (merchantId: string, membershipId: string, rewardId: string, idempotencyKey: string) =>
     apiFetch<OperationResult>(`${base(merchantId)}/memberships/${membershipId}/redeem`, {
@@ -243,7 +471,46 @@ export const fidelity = {
   tagQrUrl: (merchantId: string, tagId: string) => `${base(merchantId)}/nfc-tags/${tagId}/qr`,
   nfcStats: (merchantId: string) => apiFetch<NfcStats>(`${base(merchantId)}/nfc/stats`),
   dashboard: (merchantId: string) => apiFetch<DashboardSummary>(`${base(merchantId)}/dashboard/summary`),
+  /** Cierre de turno: altas, sellos y canjes de hoy (zona del comercio). */
+  dashboardToday: (merchantId: string) =>
+    apiFetch<DashboardToday>(`${base(merchantId)}/dashboard/today`),
+  /** Primeros pasos del comercio nuevo (checklist del Resumen). */
+  dashboardOnboarding: (merchantId: string) =>
+    apiFetch<DashboardOnboarding>(`${base(merchantId)}/dashboard/onboarding`),
+  /** Serie diaria de operaciones del periodo (7/30/90 días). */
+  dashboardLoyalty: (merchantId: string, period: 7 | 30 | 90 = 30) =>
+    apiFetch<LoyaltySeries>(`${base(merchantId)}/dashboard/loyalty?period=${period}`),
   exportUrl: (merchantId: string) => `${base(merchantId)}/export/members.csv`,
+  /** Diseño de tarjeta (decisión #8): lectura, cambios y logotipo. */
+  branding: (merchantId: string) =>
+    apiFetch<CardBranding>(`${base(merchantId)}/branding`),
+  updateBranding: (merchantId: string, body: Partial<CardBranding> & { remove_logo?: boolean }) =>
+    apiFetch<CardBranding>(`${base(merchantId)}/branding`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  uploadLogo: (merchantId: string, file: File) =>
+    apiFetch<CardBranding>(`${base(merchantId)}/branding/logo`, {
+      method: "POST",
+      headers: { "Content-Type": file.type || "image/png" },
+      body: file,
+    }),
+  removeLogo: (merchantId: string) =>
+    apiFetch<CardBranding>(`${base(merchantId)}/branding/logo`, { method: "DELETE" }),
+  exportTransactionsUrl: (merchantId: string) => `${base(merchantId)}/export/transactions.csv`,
+  /** Altas de hoy del mostrador (puente mostrador, sin notificaciones). */
+  enrollmentsToday: (merchantId: string) =>
+    apiFetch<Membership[]>(`${base(merchantId)}/enrollments/today`),
+  /** Edición mínima del cliente (nombre y correo); el backend audita. */
+  updateMembership: (
+    merchantId: string,
+    membershipId: string,
+    body: { display_name?: string; email?: string },
+  ) =>
+    apiFetch<Membership>(`${base(merchantId)}/memberships/${membershipId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
   publicProgram: (merchantSlug: string, programSlug: string) =>
     apiFetch<PublicProgram>(`/api/v1/public/programs/${merchantSlug}/${programSlug}`),
   enroll: (
@@ -254,7 +521,8 @@ export const fidelity = {
       display_name: string;
       accepted_terms_version: number;
       privacy_notice_version: number;
-      marketing_consent?: boolean;
+      // Sin `marketing_consent`: el MVP no tiene canal de envío (§9.6) y
+      // no se pide un consentimiento que nadie puede cumplir.
     },
   ) =>
     apiFetch<{ message: string }>(
@@ -295,6 +563,10 @@ export const fidelity = {
   publicCard: (token: string) => apiFetch<PublicCard>(`/api/v1/public/memberships/${token}`),
   walletOptions: (token: string) =>
     apiFetch<WalletOptions>(`/api/v1/public/memberships/${token}/wallet-options`),
+  walletJobs: (merchantId: string) =>
+    apiFetch<WalletJob[]>(`${base(merchantId)}/wallet/jobs`),
+  retryWalletJob: (merchantId: string, jobId: string) =>
+    apiFetch<WalletJob>(`${base(merchantId)}/wallet/jobs/${jobId}/retry`, { method: "POST" }),
   lifecycleAction: (
     merchantId: string,
     membershipId: string,
@@ -306,6 +578,24 @@ export const fidelity = {
       body: JSON.stringify(reason ? { reason } : {}),
     }),
   cardQrUrl: (token: string) => `/api/v1/public/memberships/${token}/qr`,
+};
+
+/** Catálogo de planes: público, sin sesión (página /precios, §22). */
+export const plans = {
+  public: () => apiFetch<PublicPlan[]>("/api/v1/public/plans"),
+  /** Solicitud de alta: la plataforma crea el comercio y le da el acceso. */
+  requestOnboarding: (body: {
+    business_name: string;
+    contact_name: string;
+    email: string;
+    phone?: string;
+    plan: string;
+    message?: string;
+  }) =>
+    apiFetch<{ ok: boolean }>("/api/v1/public/merchant-lead", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };
 
 /** Clave idempotente por operación: única y trazable (§16.4). */

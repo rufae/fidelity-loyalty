@@ -12,7 +12,12 @@ from fastapi import APIRouter
 from app.api.deps import DbSession, PlatformAdminDep
 from app.domain.errors import user_exists
 from app.domain.roles import MerchantStatus, PlatformRole
-from app.schemas.merchant import MerchantCreate, MerchantOut, MerchantUpdate
+from app.schemas.merchant import (
+    MerchantCreate,
+    MerchantOut,
+    MerchantPlanUpdate,
+    MerchantUpdate,
+)
 from app.services import merchants as merchants_service
 from app.services.audit import record_audit
 from app.services.auth import find_user_by_email
@@ -74,6 +79,34 @@ def update_merchant(
         actor_id=context.user.id,
         merchant_id=merchant.id,
         entity_id=str(merchant.id),
+    )
+    session.commit()
+    return MerchantOut.model_validate(merchant)
+
+
+@router.patch("/merchants/{merchant_id}/plan", response_model=MerchantOut)
+def change_plan(
+    merchant_id: uuid.UUID,
+    data: MerchantPlanUpdate,
+    session: DbSession,
+    context: PlatformAdminDep,
+) -> MerchantOut:
+    """Asigna el plan contratado al comercio (dato comercial, §22).
+
+    Solo administración de plataforma: el comercio no se cambia el plan a sí
+    mismo. Queda auditado con el plan anterior y el nuevo.
+    """
+    merchant = merchants_service.get_merchant(session, merchant_id)
+    previous = merchant.plan
+    merchant.plan = data.plan
+    record_audit(
+        session,
+        action="merchant.plan_changed",
+        entity_type="merchant",
+        actor_id=context.user.id,
+        merchant_id=merchant.id,
+        entity_id=str(merchant.id),
+        metadata={"from": previous, "to": data.plan},
     )
     session.commit()
     return MerchantOut.model_validate(merchant)

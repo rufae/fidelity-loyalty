@@ -26,6 +26,12 @@ class MerchantUpdate(BaseModel):
     timezone: str | None = Field(default=None, max_length=60)
 
 
+class MerchantPlanUpdate(BaseModel):
+    """Asignación de plan: solo la administración de plataforma (§22)."""
+
+    plan: str = Field(pattern="^(basic|plus|max)$")
+
+
 class MerchantOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -37,8 +43,41 @@ class MerchantOut(BaseModel):
     timezone: str
     country_code: str
     default_locale: str
+    plan: str = "basic"
     created_at: datetime
     updated_at: datetime
+
+
+class LocationCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    address: str | None = Field(default=None, max_length=255)
+
+
+class LocationStatusUpdate(BaseModel):
+    status: str = Field(pattern="^(active|inactive)$")
+
+
+class LocationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    address: str | None = None
+    status: str
+    created_at: datetime
+
+
+class PlanUsageOut(BaseModel):
+    """Uso real del plan del comercio: cifras de la base de datos."""
+
+    plan: str
+    plan_name: str
+    max_locations: int
+    locations: int
+    max_active_programs: int
+    active_programs: int
+    max_staff: int
+    staff: int
 
 
 class MerchantUserCreate(BaseModel):

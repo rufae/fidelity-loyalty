@@ -49,3 +49,19 @@ def user_exists() -> DomainError:
     return DomainError(
         status.HTTP_409_CONFLICT, "user_exists", "Ya existe un usuario con ese email"
     )
+
+
+class PlanLimitError(DomainError):
+    """El comercio alcanzó el límite de estructura de su plan (FASE 14)."""
+
+
+def plan_limit_reached(kind: str, limit: int) -> PlanLimitError:
+    """Error legible y accionable: qué límite y qué hacer (§3.3: nada oculto)."""
+    nouns = {
+        "locations": ("tienda", "Mejora de plan para añadir más."),
+        "programs": ("programa", "Pausa o archiva uno antes, o mejora de plan."),
+        "staff": ("empleado", "Mejora de plan para dar de alta a más personal."),
+    }
+    noun, action = nouns.get(kind, nouns["locations"])
+    noun = f"{noun}{'s' if limit != 1 else ''}"
+    return PlanLimitError(409, "plan_limit_reached", f"Tu plan permite {limit} {noun}. {action}")

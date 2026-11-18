@@ -6,11 +6,12 @@ de sesión en la capa de API (§8.2): aquí no se decide quién puede ver qué.
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
-from app.domain.errors import not_found, user_exists
+from app.domain.errors import not_found, plan_limit_reached, user_exists
+from app.domain.plans import get as get_plan
 from app.domain.roles import MerchantRole, MerchantStatus, UserStatus
 from app.models.merchant import Merchant, slugify
 from app.models.user import MerchantUser, User
@@ -129,14 +130,16 @@ def list_merchant_users(
 
 
 def add_merchant_user(
-    session: Session, merchant_id: uuid.UUID, data: MerchantUserCreate
+    session: Session, merchant: Merchant, data: MerchantUserCreate
 ) -> tuple[MerchantUser, SessionUser]:
+    """Alta de personal respetando el plan (empleado activo ocupa hueco)."""
+    plan = get_plan(merchant.plan)
     normalized = str(data.email).strip().lower()
     existing = session.scalar(select(User).where(User.email == normalized))
     if existing is not None:
         already_member = session.scalar(
             select(MerchantUser).where(
-                MerchantUser.user_id == existing.id, MerchantUser.merchant_id == merchant_id
+                MerchantUser.user_id == existing.id, MerchantUser.merchant_id == merchant.id
             )
         )
         if already_member is not None:
@@ -152,9 +155,19 @@ def add_merchant_user(
         session.add(user)
         session.flush()
 
+    if data.role != MerchantRole.OWNER:
+        current = session.scalar(
+            select(func.count(MerchantUser.id)).where(
+                MerchantUser.merchant_id == merchant.id,
+                MerchantUser.status == UserStatus.ACTIVE.value,
+                MerchantUser.role != MerchantRole.OWNER.value,
+            )
+        )
+        if current is not None and int(current) >= plan.max_staff:
+            raise plan_limit_reached("staff", plan.max_staff)
     membership = MerchantUser(
         user_id=user.id,
-        merchant_id=merchant_id,
+        merchant_id=merchant.id,
         role=data.role.value,
         status=UserStatus.ACTIVE.value,
     )
@@ -179,6 +192,26 @@ def update_merchant_user(
     user = session.get(User, membership.user_id)
     if user is None:
         raise not_found("Usuario del comercio")
+
+    # Reactivar al personal también consume hueco del plan (coherente con
+    # tiendas §FASE 14): un empleado activo ocupa sitio.
+    merchant = session.get(Merchant, merchant_id)
+    if (
+        data.status == UserStatus.ACTIVE.value
+        and membership.status != UserStatus.ACTIVE.value
+        and membership.role != MerchantRole.OWNER.value
+        and merchant is not None
+    ):
+        plan = get_plan(merchant.plan)
+        current = session.scalar(
+            select(func.count(MerchantUser.id)).where(
+                MerchantUser.merchant_id == merchant_id,
+                MerchantUser.status == UserStatus.ACTIVE.value,
+                MerchantUser.role != MerchantRole.OWNER.value,
+            )
+        )
+        if current is not None and int(current) >= plan.max_staff:
+            raise plan_limit_reached("staff", plan.max_staff)
 
     if data.role is not None:
         membership.role = data.role.value
