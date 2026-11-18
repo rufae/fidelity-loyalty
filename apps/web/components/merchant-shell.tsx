@@ -14,11 +14,15 @@ import {
   IconMail,
   IconMenu,
   IconScan,
+  IconSparkles,
   IconStar,
+  IconStore,
+  IconUser,
   IconUsers,
 } from "@/components/ui";
 import { MerchantProvider } from "@/components/merchant-context";
 import { ApiError, apiFetch } from "@/lib/api";
+import { support } from "@/lib/support";
 import {
   isPlatformAdmin,
   canManageMerchant,
@@ -54,11 +58,14 @@ const MANAGER_GROUPS = [
     items: [
       { href: "/programs", label: "Programas", icon: IconGift },
       { href: "/members", label: "Clientes", icon: IconUsers },
+      { href: "/design", label: "Diseño de tarjeta", icon: IconSparkles },
     ],
   },
   {
-    label: "En tu local",
+    label: "Tu comercio",
     items: [
+      { href: "/stores", label: "Tiendas", icon: IconStore },
+      { href: "/team", label: "Equipo", icon: IconUser },
       { href: "/nfc", label: "NFC y QR", icon: IconContactless },
       { href: "/reviews", label: "Reseñas Google", icon: IconStar },
     ],
@@ -129,6 +136,8 @@ export function MerchantShell({
   /** Reintento del usuario: cada intento relanza la carga de sesión. */
   const [attempt, setAttempt] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  /** Conversaciones de soporte con respuesta sin leer: punto en la navegación. */
+  const [supportUnread, setSupportUnread] = useState(0);
 
   /** Cierra la sesión del panel (logout real en backend) y vuelve al acceso. */
   async function logout() {
@@ -203,6 +212,34 @@ export function MerchantShell({
   const root = `/merchants/${merchantId}`;
   const platformAdmin = session ? isPlatformAdmin(session.user) : false;
 
+  // Punto de soporte sin leer: sondeo discreto solo con sesión válida y
+  // pestaña visible. Un fallo de red no ensucia la interfaz: se reintenta.
+  useEffect(() => {
+    if (allowed !== true) return;
+    let cancelled = false;
+    const poll = async (): Promise<void> => {
+      try {
+        const { count } = await support.unreadCount(merchantId);
+        if (!cancelled) setSupportUnread(count);
+      } catch {
+        // Silencioso a propósito: la insignia nunca es crítica.
+      }
+    };
+    void poll();
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void poll();
+    }, 45_000);
+    const onVisibility = (): void => {
+      if (document.visibilityState === "visible") void poll();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [allowed, merchantId, pathname]);
+
   // Guardia de interfaz: cada pantalla declara qué rol necesita; quien no lo
   // tiene es enviado a su pantalla útil (el backend sigue siendo el control).
   useEffect(() => {
@@ -260,8 +297,19 @@ export function MerchantShell({
                     active ? "bg-brand opacity-100" : "opacity-0 group-hover:opacity-40"
                   }`}
                 />
-                <Icon size={19} className={active ? "text-brand" : "text-ink-faint group-hover:text-ink-soft"} />
-                {item.label}
+                <Icon
+                  size={19}
+                  className={`transition-transform duration-200 group-hover:translate-x-0.5 ${
+                    active ? "text-brand" : "text-ink-faint group-hover:text-ink-soft"
+                  }`}
+                />
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                {item.href === "/support" && supportUnread > 0 && (
+                  <span className="flex min-h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[10px] font-bold text-white">
+                    {supportUnread > 9 ? "9+" : supportUnread}
+                    <span className="sr-only"> respuestas sin leer en soporte</span>
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -274,7 +322,7 @@ export function MerchantShell({
     <div className="mt-auto space-y-3 border-t border-line pt-4">
       <div className="flex items-center gap-2.5">
         {/* Inicial del correo: avatar discreto sin datos personales nuevos. */}
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(145deg,#6a58e8,#4633b8)] text-sm font-bold text-white shadow-soft">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full brand-tile text-sm font-bold shadow-soft">
           {(session?.user.email ?? "?").charAt(0).toUpperCase()}
         </span>
         <span className="min-w-0">
@@ -313,6 +361,7 @@ export function MerchantShell({
     >
       <a
         href="#contenido"
+        data-print="hide"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-xl focus:bg-brand focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white"
       >
         Saltar al contenido
@@ -320,7 +369,10 @@ export function MerchantShell({
 
       <div className="min-h-screen lg:flex">
         {/* Sidebar cálida en escritorio: papel, no una franja negra genérica. */}
-        <aside className="sticky top-0 hidden h-screen w-[264px] shrink-0 flex-col gap-5 border-r border-line bg-paper px-4 py-5 lg:flex">
+        <aside
+          data-print="hide"
+          className="sticky top-0 hidden h-screen w-[264px] shrink-0 flex-col gap-5 border-r border-line bg-paper px-4 py-5 lg:flex"
+        >
           <Link href="/merchants" className="block px-1.5">
             <BrandLogo />
           </Link>
@@ -330,7 +382,7 @@ export function MerchantShell({
               Comercio
             </p>
             <div className="mt-1.5 flex items-center gap-2.5">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(145deg,#6a58e8,#4633b8)] text-sm font-bold text-white">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl brand-tile text-sm font-bold">
                 {mark(merchantName)}
               </span>
               <span className="min-w-0">
@@ -347,7 +399,10 @@ export function MerchantShell({
 
         {/* Contenido */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-canvas/90 px-4 py-3 backdrop-blur lg:hidden">
+          <header
+            data-print="hide"
+            className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-canvas/90 px-4 py-3 backdrop-blur lg:hidden"
+          >
             <Link href="/merchants" className="min-w-0">
               <BrandLogo compact />
             </Link>
@@ -373,7 +428,7 @@ export function MerchantShell({
           </header>
 
           {menuOpen && (
-            <div className="fixed inset-0 z-40 lg:hidden">
+            <div className="fixed inset-0 z-40 lg:hidden" data-print="hide">
               <div
                 className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
                 onClick={() => setMenuOpen(false)}
@@ -395,7 +450,7 @@ export function MerchantShell({
                     Comercio
                   </p>
                   <div className="mt-1.5 flex items-center gap-2.5">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(145deg,#6a58e8,#4633b8)] text-sm font-bold text-white">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-xl brand-tile text-sm font-bold">
                       {mark(merchantName)}
                     </span>
                     <span className="min-w-0">
@@ -412,21 +467,30 @@ export function MerchantShell({
           )}
 
           <main id="contenido" className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-            <nav aria-label="Migas de pan" className="mb-3 flex flex-wrap items-center gap-1.5 text-xs text-ink-faint">
-              <Link href="/merchants" className="transition-colors hover:text-brand">
-                Comercios
-              </Link>
-              <span aria-hidden="true">/</span>
-              <span className="max-w-[12rem] truncate text-ink-soft">{merchantName}</span>
-              <span aria-hidden="true">/</span>
-              <span aria-current="page" className="font-semibold text-ink">
+            <div key={pathname} className="animate-in">
+              <nav
+                aria-label="Migas de pan"
+                data-print="hide"
+                className="mb-3 flex flex-wrap items-center gap-1.5 text-xs text-ink-faint"
+              >
+                <Link href="/merchants" className="transition-colors hover:text-brand">
+                  Comercios
+                </Link>
+                <span aria-hidden="true">/</span>
+                <span className="max-w-[12rem] truncate text-ink-soft">{merchantName}</span>
+                <span aria-hidden="true">/</span>
+                <span aria-current="page" className="font-semibold text-ink">
+                  {title}
+                </span>
+              </nav>
+              <h1
+                data-print="hide"
+                className="mb-6 text-[26px] font-bold tracking-[-0.02em] text-ink sm:text-[30px]"
+              >
                 {title}
-              </span>
-            </nav>
-            <h1 className="mb-6 text-[26px] font-bold tracking-[-0.02em] text-ink sm:text-[30px]">
-              {title}
-            </h1>
-            {children}
+              </h1>
+              {children}
+            </div>
           </main>
         </div>
       </div>

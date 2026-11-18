@@ -9,6 +9,7 @@ import {
   Button,
   ConfirmDialog,
   CopyButton,
+  CountUp,
   EmptyState,
   IconContactless,
   IconDownload,
@@ -20,12 +21,14 @@ import {
   IconStar,
   Input,
   LoadingState,
+  LinkButton,
   Modal,
   Panel,
   SectionTitle,
   Select,
   StatusPill,
   IconWallet,
+  IconArrowRight,
 } from "@/components/ui";
 import { ArtSparkles } from "@/components/ui/art";
 import { ApiError } from "@/lib/api";
@@ -290,7 +293,7 @@ export function NfcView({ merchantId }: { merchantId: string }) {
     : [];
 
   return (
-    <div className="space-y-6">
+    <div className="stagger space-y-6">
       {error && (
         <Alert tone="danger" title="No se pudo completar">
           {error}
@@ -301,6 +304,32 @@ export function NfcView({ merchantId }: { merchantId: string }) {
           {notice}
         </Alert>
       )}
+
+      {/* Material para el mostrador (§14.2): hoja A4 con los dos QR,
+          cada uno en su bloque para no mezclar recorridos (§5.1). */}
+      <Panel className="animate-in">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gold-soft text-warn">
+              <IconDownload size={18} />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-ink">Póster imprimible para el mostrador</h2>
+              <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
+                Hoja A4 con el QR de alta y el de reseñas, claramente separados. Se imprime desde
+                el navegador.
+              </p>
+            </div>
+          </div>
+          <LinkButton
+            href={`/merchants/${merchantId}/poster`}
+            variant="secondary"
+            icon={<IconArrowRight size={16} />}
+          >
+            Ver póster
+          </LinkButton>
+        </div>
+      </Panel>
 
       {/* Uso real: un dato principal y el resto en segundo plano. */}
       {stats && (
@@ -316,12 +345,12 @@ export function NfcView({ merchantId }: { merchantId: string }) {
                 aria-hidden="true"
                 className="absolute -right-8 -top-10 size-28 rounded-full border border-white/15"
               />
-              <ArtSparkles className="pointer-events-none absolute right-3 top-3 h-9 w-9 opacity-70" />
+              <ArtSparkles className="animate-twinkle pointer-events-none absolute right-3 top-3 h-9 w-9 opacity-70" />
               <p className="relative text-[11px] font-semibold uppercase tracking-[0.13em] text-white/60">
                 Total de clics
               </p>
               <p className="tnum relative mt-1.5 text-[42px] font-bold leading-none tracking-[-0.03em]">
-                {formatNumber(stats.total_clicks)}
+                <CountUp value={stats.total_clicks} />
               </p>
               <p className="relative mt-1 text-[11px] text-white/55">
                 suma de todos los tipos de etiqueta
@@ -598,13 +627,13 @@ export function NfcView({ merchantId }: { merchantId: string }) {
           description="Crea la primera con el formulario de arriba y descarga su QR para imprimirlo o programar tu etiqueta NFC."
         />
       ) : (
-        <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <ul className="stagger grid grid-cols-1 gap-3 lg:grid-cols-2">
           {tags.map((tag) => {
             const meta = TAG_META[tag.tag_type];
             return (
               <li
                 key={tag.id}
-                className={`relative overflow-hidden rounded-2xl border bg-surface p-4 pl-5 shadow-soft transition-colors sm:p-5 sm:pl-6 ${
+                className={`relative overflow-hidden rounded-2xl border bg-surface p-4 pl-5 shadow-soft transition-transform duration-300 hover:-translate-y-0.5 sm:p-5 sm:pl-6 ${
                   tag.status === "active" ? "border-line" : "border-line opacity-80"
                 }`}
               >
