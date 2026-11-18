@@ -1,6 +1,7 @@
 """Modelos ORM: importarlos aquí los registra en `Base.metadata` para Alembic."""
 
 from app.models.audit import AuditEvent
+from app.models.branding import Asset, MerchantBranding
 from app.models.card_access import MemberCardSession, MemberEmailToken
 from app.models.ledger import LoyaltyTransaction, RewardRedemption
 from app.models.loyalty import LoyaltyProgram, ProgramReward
@@ -13,10 +14,11 @@ from app.models.support import (
     SupportNotification,
     SupportThread,
 )
-from app.models.user import MerchantUser, User, UserSession
+from app.models.user import MerchantUser, PasswordResetToken, User, UserSession
 from app.models.wallet import BackgroundJob, WalletPass
 
 __all__ = [
+    "Asset",
     "AuditEvent",
     "BackgroundJob",
     "MemberCardSession",
@@ -27,6 +29,7 @@ __all__ = [
     "Member",
     "Membership",
     "Merchant",
+    "MerchantBranding",
     "NfcTag",
     "RedirectEvent",
     "ReviewDestination",
@@ -35,6 +38,7 @@ __all__ = [
     "SupportNotification",
     "SupportThread",
     "MerchantUser",
+    "PasswordResetToken",
     "ProgramReward",
     "User",
     "UserSession",

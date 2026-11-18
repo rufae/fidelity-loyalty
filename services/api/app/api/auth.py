@@ -13,14 +13,22 @@ from app.domain.errors import (
     invalid_credentials,
     login_rate_limited,
 )
-from app.schemas.auth import LoginRequest, PasswordChangeRequest, SessionPayload
+from app.schemas.auth import (
+    LoginRequest,
+    PasswordChangeRequest,
+    PasswordResetConfirm,
+    PasswordResetRequest,
+    SessionPayload,
+)
 from app.services import auth as auth_service
+from app.services import password_reset as password_reset_service
 from app.services.audit import record_audit
 from app.services.auth import email_hash
 
 router = APIRouter(prefix="/auth", tags=["autenticación"])
 
 _rate_limiter: LoginRateLimiter | None = None
+_reset_limiter: LoginRateLimiter | None = None
 
 
 def get_rate_limiter(settings: Annotated[Settings, Depends(get_settings)]) -> LoginRateLimiter:
@@ -34,9 +42,18 @@ def get_rate_limiter(settings: Annotated[Settings, Depends(get_settings)]) -> Lo
     return _rate_limiter
 
 
+def get_reset_limiter(settings: Annotated[Settings, Depends(get_settings)]) -> LoginRateLimiter:
+    """Limitador propio para la recuperación: menor margen que el login."""
+    global _reset_limiter
+    if _reset_limiter is None:
+        _reset_limiter = LoginRateLimiter(max_attempts=5, window_seconds=900)
+    return _reset_limiter
+
+
 def reset_rate_limiter() -> None:
-    global _rate_limiter
+    global _rate_limiter, _reset_limiter
     _rate_limiter = None
+    _reset_limiter = None
 
 
 def _client_ip(request: Request) -> str:
@@ -183,4 +200,71 @@ def change_password(
     token = auth_service.create_session(session, context.user, settings)
     session.commit()
     _set_session_cookie(response, token, settings)
+    return {"ok": True}
+
+
+@router.post("/password-reset", status_code=202)
+def request_password_reset(
+    payload: PasswordResetRequest,
+    request: Request,
+    session: DbSession,
+    settings: Annotated[Settings, Depends(get_settings)],
+    limiter: Annotated[LoginRateLimiter, Depends(get_reset_limiter)],
+) -> dict[str, bool]:
+    """Solicita un enlace de recuperación (§8.3).
+
+    Respuesta **idéntica** exista o no el email (§8.2, sin enumeración de
+    cuentas): si existe, se envía el correo; si no, nada. Limitado por IP.
+    """
+    key = f"{_client_ip(request)}|reset"
+    decision = limiter.check(key)
+    if not decision.allowed:
+        raise login_rate_limited(decision.retry_after_seconds)
+    sent = False
+    try:
+        sent = password_reset_service.request_reset(session, settings, payload.email)
+    except Exception:
+        # Sin SMTP configurado la solicitud también responde 202: igual que
+        # un email inexistente (y la plataforma ve la causa en los logs).
+        session.rollback()
+        sent = False
+    else:
+        session.commit()
+    finally:
+        limiter.record_failure(key)  # Cada solicitud gasta cupo, acierto o no.
+    if sent:
+        user = auth_service.find_user_by_email(session, payload.email)
+        if user is not None:
+            record_audit(
+                session,
+                action="auth.password_reset.requested",
+                entity_type="user",
+                actor_id=user.id,
+                entity_id=str(user.id),
+            )
+            session.commit()
+    return {"ok": True}
+
+
+@router.post("/password-reset/confirm")
+def confirm_password_reset(
+    payload: PasswordResetConfirm,
+    request: Request,
+    session: DbSession,
+    limiter: Annotated[LoginRateLimiter, Depends(get_reset_limiter)],
+) -> dict[str, bool]:
+    """Consume el enlace, fija la nueva contraseña y revoca todas las sesiones."""
+    key = f"{_client_ip(request)}|confirm"
+    decision = limiter.check(key)
+    if not decision.allowed:
+        raise login_rate_limited(decision.retry_after_seconds)
+    user = password_reset_service.confirm_reset(session, payload.token, payload.new_password)
+    record_audit(
+        session,
+        action="auth.password_reset.confirmed",
+        entity_type="user",
+        actor_id=user.id,
+        entity_id=str(user.id),
+    )
+    session.commit()
     return {"ok": True}

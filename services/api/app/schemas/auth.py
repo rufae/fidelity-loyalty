@@ -21,6 +21,19 @@ class PasswordChangeRequest(BaseModel):
     new_password: str = Field(min_length=10, max_length=256)
 
 
+class PasswordResetRequest(BaseModel):
+    """Solicitud de recuperación: respuesta idéntica exista o no el email (§8.2)."""
+
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    """Define la nueva contraseña con el enlace de un solo uso."""
+
+    token: str = Field(min_length=20, max_length=200)
+    new_password: str = Field(min_length=10, max_length=256)
+
+
 class MerchantMembership(BaseModel):
     """Pertenece a la respuesta de sesión: el navegador nunca la envía como prueba."""
 

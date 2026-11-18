@@ -11,7 +11,7 @@ exactamente la relación que el §11.4 describe.
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, String, UniqueConstraint, Uuid
+from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -94,3 +94,22 @@ class UserSession(Base):
         if expires.tzinfo is None:
             expires = expires.replace(tzinfo=UTC)
         return expires > datetime.now(UTC)
+
+
+class PasswordResetToken(Base):
+    """Solicitud de recuperación de contraseña de personal (§8.3).
+
+    Un solo uso, caduca en 30 minutos y se guarda **hasheado** (igual que los
+    tokens de acceso a tarjeta): filtrar la tabla no filtra los enlaces.
+    """
+
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
