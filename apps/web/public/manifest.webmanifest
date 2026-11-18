@@ -1,0 +1,33 @@
+{
+  "name": "LocalAI Fidelity",
+  "short_name": "Fidelity",
+  "description": "Tu tarjeta de fidelización siempre contigo: sellos, recompensas y QR para el mostrador.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "es",
+  "background_color": "#f7f4ee",
+  "theme_color": "#6c5ce7",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

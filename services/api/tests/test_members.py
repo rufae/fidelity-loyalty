@@ -279,10 +279,10 @@ def test_listado_de_miembros_solo_para_el_comercio(client: TestClient, db_sessio
     assert propietario.status_code == 200
     assert len(propietario.json()) == 1
     assert propietario.json()[0]["email"] == "cliente@example.com"
-    assert equipo.status_code == 200 and len(equipo.json()) == 1
+    assert equipo.status_code == 200 and equipo.json()["total"] == 1
     # El token público no es una credencial de administración: el listado del
     # comercio es lo que da acceso a la gestión, no el token.
-    assert equipo.json()[0]["public_token"]
+    assert equipo.json()["items"][0]["public_token"]
 
 
 def test_staff_no_ve_miembros(client: TestClient, db_session: Session) -> None:
@@ -360,9 +360,16 @@ def test_alta_audita_solo_membresias_nuevas(client: TestClient, db_session: Sess
     nuevo, y el alta en un segundo programa del mismo comercio sí.
     """
     from app.models.audit import AuditEvent
+    from app.models.merchant import Merchant
 
     merchant_id, slug = _active_program(client, db_session)
     login(client, OWNER_EMAIL)
+    # Dos programas en vivo: el plan básico solo permite uno (tasks.md §5);
+    # este escenario es un comercio Plus.
+    merchant = db_session.get(Merchant, merchant_id)
+    assert merchant is not None
+    merchant.plan = "plus"
+    db_session.commit()
     program_b = client.post(
         f"/api/v1/merchants/{merchant_id}/programs",
         json={"name": "Menú", "terms": TERMS},
@@ -398,3 +405,87 @@ def test_alta_audita_solo_membresias_nuevas(client: TestClient, db_session: Sess
         dict(body),
     )
     assert enfoques() == 2
+
+
+def test_alta_en_mostrador_crea_tarjeta_activa_al_instante(
+    client: TestClient, db_session: Session
+) -> None:
+    """El personal (también staff) crea la tarjeta en el local, activa y usable."""
+    merchant_id, _ = _active_program(client, db_session)
+
+    # El listado de programas es de administración; el id se toma como owner.
+    login(client, OWNER_EMAIL)
+    programs = client.get(f"/api/v1/merchants/{merchant_id}/programs").json()
+    program_id = next(p["id"] for p in programs if p["status"] == "active")
+    client.post("/api/v1/auth/logout")
+
+    # Y el alta en mostrador la ejecuta el personal operativo.
+    login(client, STAFF_EMAIL)
+
+    response = client.post(
+        f"/api/v1/merchants/{merchant_id}/memberships",
+        json={
+            "program_id": program_id,
+            "display_name": "Cliente Mostrador",
+            "accepted_terms_version": 1,
+            "privacy_notice_version": 1,
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["created"] is True
+    membership = body["membership"]
+    assert membership["status"] == "active"
+    assert membership["stamps"] == 0
+
+    row = db_session.get(Membership, uuid.UUID(membership["id"]))
+    assert row is not None and row.origin == "counter"
+
+
+def test_alta_en_mostrador_es_idempotente_por_correo(
+    client: TestClient, db_session: Session
+) -> None:
+    """Repetir el alta del mismo cliente devuelve su tarjeta, sin duplicar."""
+    merchant_id, _ = _active_program(client, db_session)
+    login(client, OWNER_EMAIL)
+    programs = client.get(f"/api/v1/merchants/{merchant_id}/programs").json()
+    program_id = next(p["id"] for p in programs if p["status"] == "active")
+    payload = {
+        "program_id": program_id,
+        "display_name": "Con Correo",
+        "email": "mostrador@example.com",
+        "accepted_terms_version": 1,
+        "privacy_notice_version": 1,
+    }
+    first = client.post(f"/api/v1/merchants/{merchant_id}/memberships", json=payload)
+    again = client.post(f"/api/v1/merchants/{merchant_id}/memberships", json=payload)
+    assert first.status_code == 200 and again.status_code == 200
+    assert first.json()["created"] is True
+    assert again.json()["created"] is False
+    assert again.json()["membership"]["id"] == first.json()["membership"]["id"]
+
+
+def test_tarjeta_de_mostrador_abre_con_correo_sin_verificar(
+    client: TestClient, db_session: Session
+) -> None:
+    """El ancla de confianza del mostrador es presencial: el email no bloquea."""
+    merchant_id, _ = _active_program(client, db_session)
+    login(client, OWNER_EMAIL)
+    programs = client.get(f"/api/v1/merchants/{merchant_id}/programs").json()
+    program_id = next(p["id"] for p in programs if p["status"] == "active")
+
+    body = client.post(
+        f"/api/v1/merchants/{merchant_id}/memberships",
+        json={
+            "program_id": program_id,
+            "display_name": "Con Correo",
+            "email": "sin.verificar@example.com",
+            "accepted_terms_version": 1,
+            "privacy_notice_version": 1,
+        },
+    ).json()
+    token = body["membership"]["public_token"]
+
+    card = client.get(f"/api/v1/public/memberships/{token}")
+    assert card.status_code == 200, card.text
+    assert card.json()["program_name"]

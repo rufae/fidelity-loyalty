@@ -58,6 +58,10 @@ class Membership(Base):
     #: ni da acceso a datos privados del comercio (§5.2).
     public_token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     status: Mapped[str] = mapped_column(String(20), default="active")
+    #: De dónde nace la tarjeta (ADR-0006 revisado): "public" (la verificación
+    #: de email es requisito) o "counter" (entrega presencial: el email se
+    #: registra sin verificar y **no** bloquea la tarjeta).
+    origin: Mapped[str] = mapped_column(String(20), default="public", server_default="public")
     #: Ciclo de vida (ADR-0005): motivo/fecha del último cambio de estado y
     #: trazas de supresión de datos. `anonymized` conserva el ledger asociado.
     status_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)

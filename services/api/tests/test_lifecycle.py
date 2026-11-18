@@ -168,7 +168,7 @@ def test_supresion_anonimiza_y_conserva_el_ledger(client: TestClient, db_session
     assert solicitud.json()["deletion_requested_at"]
 
     # La solicitud pendiente sigue visible en la lista para poder completarla.
-    pendientes = client.get(f"/api/v1/merchants/{merchant_id}/memberships").json()
+    pendientes = client.get(f"/api/v1/merchants/{merchant_id}/memberships").json()["items"]
     assert [row["status"] for row in pendientes] == ["deletion_pending"]
 
     anonimizada = _action(client, merchant_id, membership_id, "anonymize")
@@ -235,7 +235,7 @@ def test_eliminar_en_un_paso_y_desaparece_de_las_listas(
     assert len(movimientos_despues) == movimientos_antes
 
     # El cliente eliminado ya no aparece en las listas del comercio.
-    assert client.get(f"/api/v1/merchants/{merchant_id}/memberships").json() == []
+    assert client.get(f"/api/v1/merchants/{merchant_id}/memberships").json()["items"] == []
     assert client.get(f"/api/v1/merchants/{merchant_id}/members").json() == []
 
 

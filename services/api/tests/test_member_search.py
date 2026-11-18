@@ -99,13 +99,13 @@ def test_el_listado_de_clientes_filtra_por_nombre_o_correo(
     )
 
     assert response.status_code == 200
-    rows = response.json()
+    rows = response.json()["items"]
     assert len(rows) == 1
     assert rows[0]["public_token"] == token
     assert rows[0]["member_name"] == "Cliente de Prueba"
 
     vacio = client.get(f"/api/v1/merchants/{merchant_id}/memberships", params={"q": "nadie-asi"})
-    assert vacio.json() == []
+    assert vacio.json()["items"] == []
 
 
 def test_el_lookup_de_mostrador_incluye_la_identidad_del_cliente(
@@ -133,7 +133,14 @@ def test_las_tarjetas_del_cliente_cubren_todos_sus_programas(
     """Un cliente en dos programas (5 cafés y 3 menús) tiene dos tarjetas."""
     merchant_id, token, _ = _world(client, db_session)
 
-    # Segundo programa del mismo comercio, publicado.
+    # Segundo programa del mismo comercio, publicado. Dos programas en vivo:
+    # el plan básico solo permite uno (tasks.md §5) → escenario Plus.
+    from app.models.merchant import Merchant
+
+    merchant = db_session.get(Merchant, merchant_id)
+    assert merchant is not None
+    merchant.plan = "plus"
+    db_session.commit()
     login(client, OWNER_EMAIL)
     second = client.post(
         f"/api/v1/merchants/{merchant_id}/programs",

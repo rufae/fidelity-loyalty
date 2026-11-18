@@ -39,8 +39,12 @@ from app.schemas.members import (
     EmailActionIn,
     EnrollRequest,
     EnrollResponse,
+    ManualEnrollIn,
+    ManualEnrollOut,
     MemberOut,
     MembershipOut,
+    MembershipPage,
+    MemberUpdateIn,
     PublicMembershipOut,
 )
 from app.services import card_access as card_access_service
@@ -394,16 +398,28 @@ def list_members(
     return [MemberOut.model_validate(m) for m in members_service.list_members(session, merchant_id)]
 
 
-@router.get("/merchants/{merchant_id}/memberships", response_model=list[MembershipOut])
+@router.get(
+    "/merchants/{merchant_id}/memberships",
+    response_model=MembershipPage,
+)
 def list_memberships(
     merchant_id: uuid.UUID,
     session: DbSession,
     context: MerchantAdminDep,  # noqa: ARG001
     q: Annotated[str | None, Query(min_length=2, max_length=120)] = None,
-) -> list[MembershipOut]:
-    """Tarjetas del comercio; `q` filtra por nombre o correo del cliente (§13.5)."""
-    rows = members_service.list_memberships(session, merchant_id, q=q)
-    return members_service.to_outs(session, merchant_id, rows)
+    ready: Annotated[bool, Query()] = False,
+    limit: Annotated[int, Query(ge=1, le=100)] = 25,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> MembershipPage:
+    """Página de tarjetas del comercio (§12.1, §13.5).
+
+    `q` filtra por nombre o correo del cliente; `ready` deja solo las que
+    tienen una recompensa activa ya alcanzable (chip «Premio listo»). La
+    respuesta incluye los contadores reales que rotula la cabecera.
+    """
+    return members_service.page_memberships(
+        session, merchant_id, q=q, ready=ready, limit=limit, offset=offset
+    )
 
 
 @router.get(
@@ -435,6 +451,30 @@ def search_memberships(
     )
     session.commit()
     return members_service.to_outs(session, merchant_id, rows)
+
+
+@router.post("/merchants/{merchant_id}/memberships", response_model=ManualEnrollOut)
+def manual_enroll(
+    merchant_id: uuid.UUID,
+    data: ManualEnrollIn,
+    session: DbSession,
+    context: OperatorDep,
+) -> ManualEnrollOut:
+    """Alta en mostrador (§13.5): el personal crea la tarjeta en el local.
+
+    Autenticada y con rol de operador. Sin datos sensibles en la respuesta:
+    `public_token` es el identificador de tarjeta que el mostrador ya maneja
+    en cada operación. El alta duplicada no crea una segunda tarjeta: devuelve
+    la existente (`created=False`).
+    """
+    membership, created = members_service.manual_enroll(
+        session,
+        merchant_id,
+        data,
+        actor_user_id=context.user.id,  # type: ignore[attr-defined]
+    )
+    out = members_service.to_outs(session, merchant_id, [membership])[0]
+    return ManualEnrollOut(membership=out, created=created)
 
 
 @router.get(
@@ -472,6 +512,53 @@ def _scoped_membership(
     if membership is None or membership.merchant_id != merchant_id:
         raise DomainError(404, "membership_not_found", "Membresía no encontrada")
     return membership
+
+
+@router.patch(
+    "/merchants/{merchant_id}/memberships/{membership_id}",
+    response_model=MembershipOut,
+)
+def update_membership_member(
+    merchant_id: uuid.UUID,
+    membership_id: uuid.UUID,
+    data: MemberUpdateIn,
+    session: DbSession,
+    context: MerchantAdminDep,
+) -> MembershipOut:
+    """Edita nombre y correo del cliente (decisión de compra #9, §9.3).
+
+    Cambio auditado. Si el correo cambia, queda sin verificar: nadie hereda
+    una identidad verificada editando un campo.
+    """
+    membership = _scoped_membership(session, merchant_id, membership_id)
+    old_email = None
+    member = session.get(Member, membership.member_id)
+    if member is not None:
+        old_email = member.email
+    members_service.update_member(session, merchant_id, membership_id, data)
+    record_audit(
+        session,
+        action="member.updated",
+        entity_type="membership",
+        entity_id=str(membership.id),
+        actor_id=context.user.id,
+        merchant_id=merchant_id,
+        metadata={
+            "fields": ", ".join(
+                key
+                for key, present in (
+                    ("display_name", data.display_name is not None),
+                    (
+                        "email",
+                        data.email is not None and str(data.email).lower() != (old_email or ""),
+                    ),
+                )
+                if present
+            )
+        },
+    )
+    session.commit()
+    return members_service.to_out(session, merchant_id, membership)
 
 
 @router.post(

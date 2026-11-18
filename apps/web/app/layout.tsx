@@ -23,6 +23,19 @@ export const metadata: Metadata = {
   title: "LocalAI Fidelity",
   description:
     "Plataforma de fidelización digital: tarjetas Apple/Google Wallet, puntos y sellos, etiquetas NFC/QR y enlaces de reseñas",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Fidelity",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
