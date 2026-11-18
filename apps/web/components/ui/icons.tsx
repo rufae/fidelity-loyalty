@@ -38,6 +38,17 @@ export function IconGrid(props: IconProps) {
   );
 }
 
+export function IconStore(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 10 5.5 4h13L20 10" />
+      <path d="M4 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 4 0" />
+      <path d="M5 12.5V20h14v-7.5" />
+      <path d="M9.5 20v-5h5v5" />
+    </Svg>
+  );
+}
+
 export function IconGift(props: IconProps) {
   return (
     <Svg {...props}>

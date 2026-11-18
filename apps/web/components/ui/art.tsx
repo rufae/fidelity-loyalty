@@ -52,8 +52,9 @@ export function ArtCoffeeCup({ className = "" }: SizeProps) {
       aria-hidden="true"
       focusable="false"
     >
-      {/* Vapor */}
-      <path d="M46 34c0-8 10-8 10-16M62 30c0-8 10-8 10-16" stroke="#c25e22" strokeWidth="3.5" strokeLinecap="round" opacity="0.75" />
+      {/* Vapor: dos hilos que suben y se disipan (animación en globals.css). */}
+      <path d="M46 34c0-8 10-8 10-16" stroke="#c25e22" strokeWidth="3.5" strokeLinecap="round" opacity="0.75" className="steam" />
+      <path d="M62 30c0-8 10-8 10-16" stroke="#c25e22" strokeWidth="3.5" strokeLinecap="round" opacity="0.75" className="steam steam-late" />
       {/* Taza */}
       <path d="M32 52h48l-5 38a8 8 0 0 1-8 7H45a8 8 0 0 1-8-7l-5-38z" fill="#fbf9f5" stroke="#1c1929" strokeWidth="3" strokeLinejoin="round" />
       <path d="M32 62h48l-1.5 12a4 4 0 0 1-4 3.5H37.5a4 4 0 0 1-4-3.5L32 62z" fill="#8b5e3c" opacity="0.25" />
@@ -152,8 +153,16 @@ export function ArtRewards({ className = "" }: SizeProps) {
   );
 }
 
-/** Swoosh decorativo, a mano alzada, para subrayar una palabra clave. */
-export function ArtUnderline({ className = "" }: SizeProps) {
+/** Swoosh decorativo, a mano alzada, para subrayar una palabra clave.
+ *
+ *  Con `draw`, el trazo se dibuja una sola vez al entrar (stroke-dashoffset):
+ *  la firma del titular de la portada. Sin `draw` queda estático, como en el
+ *  resto de usos.
+ */
+export function ArtUnderline({ className = "", draw = false }: SizeProps & { draw?: boolean }) {
+  const drawStyle = draw
+    ? { strokeDasharray: 300, strokeDashoffset: 300, animation: "underline-draw 1s 0.55s var(--ease-out-quint) forwards" }
+    : undefined;
   return (
     <svg
       viewBox="0 0 220 22"
@@ -169,6 +178,7 @@ export function ArtUnderline({ className = "" }: SizeProps) {
         strokeWidth="8"
         strokeLinecap="round"
         opacity="0.85"
+        style={drawStyle}
       />
       <path
         d="M12 20c40-8 96-10 196-5"
@@ -176,6 +186,7 @@ export function ArtUnderline({ className = "" }: SizeProps) {
         strokeWidth="3"
         strokeLinecap="round"
         opacity="0.75"
+        style={drawStyle ? { ...drawStyle, animationDelay: "0.75s" } : undefined}
       />
     </svg>
   );

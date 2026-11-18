@@ -9,7 +9,8 @@
 import type { ReactNode } from "react";
 
 import { StampRow } from "@/components/ui/primitives";
-import { stampSlots } from "@/lib/ui";
+import { shade, stampSlots } from "@/lib/ui";
+import type { CardBranding } from "@/lib/fidelity";
 
 export interface LoyaltyRewardPreview {
   name: string;
@@ -47,9 +48,13 @@ export function LoyaltyCard({
   holderName,
   variant = "card",
   floating = false,
+  animateStamps = false,
+  stampAnimateFrom = null,
   className = "",
   stampsTestId,
   children,
+  branding = null,
+  programType = null,
 }: {
   merchantName: string;
   programName: string;
@@ -61,22 +66,43 @@ export function LoyaltyCard({
   stampsTestId?: string;
   /** Flotación lenta; solo decorativa (portada). Respeta reduced-motion. */
   floating?: boolean;
+  /** Estampado escalonado de los sellos al entrar; solo portada. */
+  animateStamps?: boolean;
+  /** Índice desde el que los sellos nuevos se estampan (tarjeta real). */
+  stampAnimateFrom?: number | null;
   className?: string;
   children?: ReactNode;
+  /** Diseño del comercio (decisión #8): colores, icono, logo y pie.
+      Sin branding usa el aspecto clásico dorado. */
+  branding?: CardBranding | null;
+  /** Tipo de programa (§7.1): rota la etiqueta entre «sellos» y «puntos». */
+  programType?: string | null;
 }) {
   const { reward, remaining } = nextReward(stamps, rewards);
   const { slots, filled } = stampSlots(stamps, reward?.stamps_required ?? null);
   const compact = variant === "preview";
   const hero = variant === "hero";
   const maxReward = rewards.reduce((max, item) => Math.max(max, item.stamps_required), 0);
+  const isPoints = programType === "points";
+
+  const accent = branding?.accent_color ?? null;
+  const hasBranding = branding !== null;
 
   return (
     <article
       aria-label={`Tarjeta de fidelización de ${merchantName}`}
-      className={`mesh-brand grain relative isolate overflow-hidden rounded-[26px] text-white shadow-lift ${
+      className={`grain relative isolate overflow-hidden rounded-[26px] text-white shadow-lift ${
         floating ? "animate-float" : ""
       } ${hero ? "min-h-[360px]" : ""} ${className}`}
+      style={
+        hasBranding
+          ? {
+              background: `linear-gradient(150deg, ${branding.primary_color} 0%, ${shade(branding.primary_color, -24)} 100%)`,
+            }
+          : undefined
+      }
     >
+      {!hasBranding && <div className="mesh-brand absolute inset-0" aria-hidden="true" />}
       {/* Luz y profundidad: una tarjeta física, no un rectángulo plano. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="absolute -right-16 -top-20 size-56 rounded-full border border-white/15" />
@@ -93,14 +119,26 @@ export function LoyaltyCard({
         {/* Cabecera: comercio + tipo de tarjeta */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
-            <span
-              aria-hidden="true"
-              className={`flex shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/15 font-bold tracking-tight text-white backdrop-blur-sm ${
-                compact ? "size-8 text-[11px]" : "size-10 text-sm"
-              }`}
-            >
-              {initials(merchantName)}
-            </span>
+            {hasBranding && branding.logo_url ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={branding.logo_url}
+                alt=""
+                aria-hidden="true"
+                className={`shrink-0 rounded-xl border border-white/25 bg-white/15 object-contain backdrop-blur-sm ${
+                  compact ? "size-8 p-1" : "size-10 p-1.5"
+                }`}
+              />
+            ) : (
+              <span
+                aria-hidden="true"
+                className={`flex shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/15 font-bold tracking-tight text-white backdrop-blur-sm ${
+                  compact ? "size-8 text-[11px]" : "size-10 text-sm"
+                }`}
+              >
+                {initials(merchantName)}
+              </span>
+            )}
             <div className="min-w-0">
               <p className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70">
                 {merchantName}
@@ -115,8 +153,15 @@ export function LoyaltyCard({
             </div>
           </div>
           {!compact && (
-            <span className="shrink-0 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/85 backdrop-blur-sm">
-              Tarjeta de sellos
+            <span
+              className="shrink-0 rounded-full border bg-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] backdrop-blur-sm"
+              style={
+                accent
+                  ? { borderColor: shade(accent, 10), color: shade(accent, 35) }
+                  : { borderColor: "rgb(255 255 255 / 0.2)", color: "rgb(255 255 255 / 0.85)" }
+              }
+            >
+              {isPoints ? "Tarjeta de puntos" : "Tarjeta de sellos"}
             </span>
           )}
         </div>
@@ -126,7 +171,7 @@ export function LoyaltyCard({
           <div className="flex items-end justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/65">
-                Sellos acumulados
+                {isPoints ? "Puntos acumulados" : "Sellos acumulados"}
               </p>
               <p className="mt-1 flex items-baseline gap-2">
                 <span
@@ -138,7 +183,13 @@ export function LoyaltyCard({
                   {stamps}
                 </span>
                 <span className={`font-medium text-white/70 ${compact ? "text-xs" : "text-sm"}`}>
-                  {stamps === 1 ? "sello" : "sellos"}
+                  {isPoints
+                    ? stamps === 1
+                      ? "punto"
+                      : "puntos"
+                    : stamps === 1
+                      ? "sello"
+                      : "sellos"}
                 </span>
               </p>
             </div>
@@ -153,7 +204,16 @@ export function LoyaltyCard({
           </div>
 
           <div className={compact ? "mt-3" : "mt-4"}>
-            <StampRow slots={slots} filled={filled} compact={compact} variant="dark" />
+            <StampRow
+              slots={slots}
+              filled={filled}
+              compact={compact}
+              variant="dark"
+              animated={animateStamps}
+              animateFrom={stampAnimateFrom}
+              accentColor={accent}
+              icon={branding?.stamp_icon ?? null}
+            />
           </div>
         </div>
 
@@ -183,6 +243,12 @@ export function LoyaltyCard({
             </div>
           </div>
         </div>
+
+        {branding?.footer_text?.trim() ? (
+          <p className="border-t border-white/15 pt-2.5 text-center text-[10px] leading-snug text-white/70">
+            {branding.footer_text}
+          </p>
+        ) : null}
 
         {children}
       </div>

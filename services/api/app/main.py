@@ -35,6 +35,11 @@ JSON_EXEMPT_PATHS = frozenset({"/api/v1/auth/logout"})
 #: `Content-Type` en todas sus peticiones ni `Origin` (no es un navegador).
 PASSKIT_PREFIXES = ("/api/v1/devices/", "/api/v1/passes/", "/api/v1/log")
 
+#: Subida de logotipo (decisión #8): cuerpo binario con MIME de imagen real.
+#: El MIME lo verifican los magic bytes del servicio; aquí solo se admite el
+#: tipo de contenido de imagen en esta ruta concreta.
+LOGO_UPLOAD_SUFFIX = "/branding/logo"
+
 
 def _origin_allowed(origin: str, request: Request, settings: Settings) -> bool:
     """¿El `Origin` de la petición coincide con el host servido? (§16.2)."""
@@ -194,7 +199,12 @@ def create_app() -> FastAPI:
                 and has_body
             ):
                 content_type = request.headers.get("content-type", "")
-                if "application/json" not in content_type:
+                is_logo_upload = request.method == "POST" and request.url.path.endswith(
+                    LOGO_UPLOAD_SUFFIX
+                )
+                json_ok = "application/json" in content_type
+                image_ok = is_logo_upload and content_type.startswith("image/")
+                if not (json_ok or image_ok):
                     return JSONResponse(
                         status_code=415,
                         content={

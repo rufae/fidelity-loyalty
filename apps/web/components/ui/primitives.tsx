@@ -2,13 +2,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { CountUp } from "@/components/ui/count-up";
 import {
   BrandMark,
   IconAlert,
   IconCheck,
   IconInfo,
 } from "@/components/ui/icons";
-import { formatNumber } from "@/lib/ui";
+import { shade } from "@/lib/ui";
 
 /* ------------------------------------------------------------------ marca */
 
@@ -536,24 +537,46 @@ export function StatCard({
         )}
       </div>
       <p className="tnum mt-auto pt-2 text-[32px] font-bold leading-none tracking-tight text-ink">
-        {typeof value === "number" ? formatNumber(value) : value}
+        {typeof value === "number" ? <CountUp value={value} /> : value}
       </p>
       {hint && <p className="mt-2 text-[11px] leading-snug text-ink-faint">{hint}</p>}
     </div>
   );
 }
 
-/** Fila de sellos derivada SIEMPRE de datos reales: nada inventado. */
+/** Fila de sellos derivada SIEMPRE de datos reales: nada inventado.
+ *
+ *  Con `animated`, los sellos ya puestos se estampan uno a uno al entrar
+ *  (portada): un `seal-pop` desplazado por sello. Estático en el resto de
+ *  usos y anulado por `prefers-reduced-motion` (regla global).
+ */
 export function StampRow({
   slots,
   filled,
   compact = false,
   variant = "light",
+  animated = false,
+  animateFrom = null,
+  accentColor = null,
+  icon = null,
 }: {
   slots: number;
   filled: number;
   compact?: boolean;
   variant?: "light" | "dark";
+  animated?: boolean;
+  /**
+   * Índice desde el que los sellos recién ganados se estampan con animación
+   * (tarjeta del cliente: solo los nuevos, no toda la fila).
+   */
+  animateFrom?: number | null;
+  /**
+   * Color de acento del comercio (decisión #8): sustituye al dorado por
+   * defecto en los sellos puestos. Nulo = aspecto clásico.
+   */
+  accentColor?: string | null;
+  /** Icono del sello del comercio: cup | heart | star | leaf | spark. */
+  icon?: string | null;
 }) {
   const size = compact ? "size-5" : "size-8";
   const empty =
@@ -563,6 +586,17 @@ export function StampRow({
   // Filas equilibradas de como mucho 5 sellos (10 → 5+5, 8 → 4+4, 7 → 4+3).
   const columns =
     slots <= 5 ? Math.max(slots, 1) : Math.ceil(slots / Math.ceil(slots / 5));
+  const filledStyle = accentColor
+    ? {
+        background: `linear-gradient(145deg, ${shade(accentColor, 26)}, ${accentColor} 55%, ${shade(accentColor, -14)})`,
+        borderColor: shade(accentColor, -32),
+        boxShadow: `inset 0 1px 0 rgb(255 255 255 / 0.6), inset 0 -2px 3px ${shade(accentColor, -45)}, 0 2px 5px rgb(74 50 8 / 0.18)`,
+      }
+    : undefined;
+  /** Aspecto clásico dorado cuando el comercio no ha definido acento. */
+  const filledClass =
+    "animate-seal border-[#d99a1f] bg-[linear-gradient(145deg,#ffd985,#f7bd4b_55%,#eaa32a)] shadow-[inset_0_1px_0_rgb(255_255_255/0.75),inset_0_-2px_3px_rgb(122_76_0/0.28),0_2px_5px_rgb(74_50_8/0.18)]";
+  const glyphColor = accentColor ? shade(accentColor, -62) : "#6b4500";
   return (
     <div
       className="grid justify-start gap-1.5"
@@ -571,21 +605,28 @@ export function StampRow({
     >
       {Array.from({ length: slots }, (_, index) => {
         const on = index < filled;
+        // Recién ganado: estampado con retardo corto y escalonado.
+        const fresh = animateFrom !== null && on && index >= animateFrom;
+        const delay = fresh ? `${(index - (animateFrom ?? 0)) * 140}ms` : animated && on ? `${640 + index * 90}ms` : undefined;
         return (
           <span
             key={index}
+            style={delay ? { animationDelay: delay, ...(on ? filledStyle : undefined) } : on ? filledStyle : undefined}
             className={`${size} relative flex items-center justify-center rounded-full border-2 transition-colors ${
               on
-                ? "animate-seal border-[#d99a1f] bg-[linear-gradient(145deg,#ffd985,#f7bd4b_55%,#eaa32a)] shadow-[inset_0_1px_0_rgb(255_255_255/0.75),inset_0_-2px_3px_rgb(122_76_0/0.28),0_2px_5px_rgb(74_50_8/0.18)]"
+                ? accentColor
+                  ? "animate-seal"
+                  : filledClass
                 : empty
             }`}
           >
+
             {on && (
-              <svg viewBox="0 0 12 12" className="size-3.5 text-[#6b4500]" fill="none">
+              <svg viewBox="0 0 12 12" className="size-3.5" fill="none" style={{ color: glyphColor }}>
                 <path
-                  d="m2.5 6.2 2.3 2.3 4.7-4.8"
+                  d={STAMP_GLYPHS[icon && icon in STAMP_GLYPHS ? icon : "check"]}
                   stroke="currentColor"
-                  strokeWidth="1.9"
+                  strokeWidth="1.7"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
@@ -597,3 +638,13 @@ export function StampRow({
     </div>
   );
 }
+
+/** Glifos de sello del catálogo de diseño (decisión #8). Trazo de 12×12. */
+const STAMP_GLYPHS: Record<string, string> = {
+  check: "m2.5 6.2 2.3 2.3 4.7-4.8",
+  cup: "M3 4.5h5.5v2.7a2.75 2.75 0 0 1-5.5 0Z M8.5 5.2h.8a1.3 1.3 0 0 1 0 2.6h-.8 M2.5 10.5h6.5",
+  heart: "M6 10C6 10 2 7.6 2 4.9 2 3.3 3.3 2.4 4.4 2.4c.8 0 1.4.5 1.6 1.1.2-.6.8-1.1 1.6-1.1 1.1 0 2.4.9 2.4 2.5C10 7.6 6 10 6 10Z",
+  star: "M6 2l1.2 2.4 2.6.4-1.9 1.9.4 2.6L6 8.1 3.7 9.3l.4-2.6L2.2 4.8l2.6-.4L6 2Z",
+  leaf: "M9.5 2.5C5 3 2.5 5.5 2.5 9.5c4 0 6.5-2.5 7-7Z M3.5 8.5C5 6.5 6.5 5 8.5 3.5",
+  spark: "M6 1.5 7 5l3.5 1L7 7l-1 3.5L5 7 1.5 6 5 5 6 1.5Z",
+};
