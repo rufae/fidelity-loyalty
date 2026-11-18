@@ -26,6 +26,7 @@ import {
   StatusPill,
 } from "@/components/ui";
 import { ApiError, apiFetch } from "@/lib/api";
+import { support } from "@/lib/support";
 import { isPlatformAdmin, type MerchantMembership, type SessionPayload } from "@/lib/session";
 
 interface MerchantRow {
@@ -63,6 +64,8 @@ export function MerchantsView() {
   const [reloadKey, setReloadKey] = useState(0);
   const [creating, setCreating] = useState(false);
   const [createdNotice, setCreatedNotice] = useState<string | null>(null);
+  /** Conversaciones de soporte con respuesta sin leer (solo plataforma). */
+  const [supportUnread, setSupportUnread] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,6 +89,29 @@ export function MerchantsView() {
       cancelled = true;
     };
   }, [router, reloadKey]);
+
+  // Punto de soporte sin leer para la plataforma: sondeo discreto cuando
+  // hay sesión de plataforma y pestaña visible.
+  useEffect(() => {
+    if (!session || !isPlatformAdmin(session.user)) return;
+    let cancelled = false;
+    const poll = async (): Promise<void> => {
+      try {
+        const { count } = await support.platformUnreadCount();
+        if (!cancelled) setSupportUnread(count);
+      } catch {
+        // Silencioso a propósito.
+      }
+    };
+    void poll();
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void poll();
+    }, 45_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [session]);
 
   const reload = () => setReloadKey((key) => key + 1);
 
@@ -148,6 +174,14 @@ export function MerchantsView() {
               <div className="flex flex-wrap items-center gap-2">
                 <LinkButton href="/platform/support" variant="secondary" icon={<IconMail size={17} />}>
                   Soporte
+                  {supportUnread > 0 && (
+                    <span className="ml-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[10px] font-bold text-white">
+                      {supportUnread > 9 ? "9+" : supportUnread}
+                      <span className="sr-only">
+                        {supportUnread === 1 ? " conversación sin leer" : " conversaciones sin leer"}
+                      </span>
+                    </span>
+                  )}
                 </LinkButton>
                 {creating ? (
                   <Button
@@ -244,7 +278,7 @@ export function MerchantsView() {
                           <div className="flex min-w-0 items-center gap-3">
                             <span
                               aria-hidden="true"
-                              className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(145deg,#6a58e8,#4633b8)] text-xs font-bold text-white shadow-soft"
+                              className="flex size-9 shrink-0 items-center justify-center rounded-xl brand-tile text-xs font-bold"
                             >
                               {mark(merchant.name)}
                             </span>
@@ -295,7 +329,7 @@ export function MerchantsView() {
               </Panel>
 
               {/* Tarjetas en móvil: mismas acciones, sin tabla comprimida */}
-              <ul className="grid grid-cols-1 gap-3 md:hidden">
+              <ul className="stagger grid grid-cols-1 gap-3 md:hidden">
                 {merchants.map((merchant) => (
                   <li key={merchant.id} className="min-w-0">
                     <Link
@@ -305,7 +339,7 @@ export function MerchantsView() {
                       <div className="flex items-center gap-3">
                         <span
                           aria-hidden="true"
-                          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(145deg,#6a58e8,#4633b8)] text-sm font-bold text-white"
+                          className="flex size-10 shrink-0 items-center justify-center rounded-xl brand-tile text-sm font-bold"
                         >
                           {mark(merchant.name)}
                         </span>
@@ -329,7 +363,7 @@ export function MerchantsView() {
                               (admin ? "Plataforma" : "—")}
                           </span>
                         </p>
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-brand">
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-brand transition-transform duration-200 group-hover:translate-x-0.5">
                           Abrir panel
                           <IconArrowRight size={13} />
                         </span>

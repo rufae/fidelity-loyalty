@@ -165,6 +165,12 @@ export const support = {
   unreadCount: (merchantId: string) =>
     apiFetch<{ count: number }>(`${merchantBase(merchantId)}/unread-count`),
 
+  /** Tema ntfy del comercio: suscripción de avisos push (Plan.md §11.3). */
+  notificationTopic: (merchantId: string) =>
+    apiFetch<{ topic: string; server_url: string | null }>(
+      `${merchantBase(merchantId)}/notification-topic`,
+    ),
+
   platformThreads: (params?: {
     status?: SupportStatus;
     merchant_id?: string;

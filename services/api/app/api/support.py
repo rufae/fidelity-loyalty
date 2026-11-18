@@ -19,13 +19,16 @@ from fastapi import APIRouter, Depends, Header, Query
 
 from app.api.deps import DbSession, PlatformAdminDep, merchant_access
 from app.core.config import Settings, get_settings
-from app.domain.roles import MERCHANT_OPERATOR_ROLES
+from app.domain.errors import DomainError
+from app.domain.roles import MERCHANT_ADMIN_ROLES, MERCHANT_OPERATOR_ROLES
+from app.models.merchant import Merchant
 from app.schemas.support import (
     SupportCallbackRequestCreate,
     SupportCallbackRequestOut,
     SupportMessageCreate,
     SupportMessageOut,
     SupportNotificationOut,
+    SupportNotificationTopicOut,
     SupportThreadCreate,
     SupportThreadDetailOut,
     SupportThreadOut,
@@ -42,6 +45,8 @@ platform_router = APIRouter(prefix="/platform/support", tags=["soporte-plataform
 
 support_operator = merchant_access(MERCHANT_OPERATOR_ROLES)
 SupportOperatorDep = Annotated[object, Depends(support_operator)]
+support_admin = merchant_access(MERCHANT_ADMIN_ROLES)
+AdminDep = Annotated[object, Depends(support_admin)]
 IdempotencyKey = Annotated[
     str | None, Header(alias="Idempotency-Key", min_length=1, max_length=120)
 ]
@@ -109,6 +114,29 @@ def create_thread(
         user_id=context.user.id,  # type: ignore[attr-defined]
         role=context.merchant_role(merchant_id),  # type: ignore[attr-defined]
         is_platform_admin=context.is_platform_admin,  # type: ignore[attr-defined]
+    )
+
+
+@merchant_router.get("/notification-topic", response_model=SupportNotificationTopicOut)
+def notification_topic(
+    merchant_id: uuid.UUID,
+    session: DbSession,
+    context: AdminDep,  # noqa: ARG001
+    settings: SupportSettings,
+) -> SupportNotificationTopicOut:
+    """Tema ntfy del comercio (§11.3): solo administración del comercio.
+
+    La consulta genera el tema si aún no existe (primera suscripción). El
+    servidor se entrega solo si está publicado; si no, la interfaz explica
+    que los avisos requieren exposición pública decidida explícitamente.
+    """
+    merchant = session.get(Merchant, merchant_id)
+    if merchant is None:
+        raise DomainError(404, "merchant_not_found", "Comercio no encontrado")
+    topic = support_notifications.ensure_merchant_topic(session, merchant)
+    return SupportNotificationTopicOut(
+        topic=topic,
+        server_url=settings.support_ntfy_public_url or None,
     )
 
 

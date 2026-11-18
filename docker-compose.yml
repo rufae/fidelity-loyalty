@@ -85,6 +85,7 @@ services:
       SUPPORT_NTFY_BASE_URL: ${SUPPORT_NTFY_BASE_URL:-}
       SUPPORT_NTFY_TOPIC: ${SUPPORT_NTFY_TOPIC:-}
       SUPPORT_NTFY_TOKEN: ${SUPPORT_NTFY_TOKEN:-}
+      SUPPORT_NTFY_PUBLIC_URL: ${SUPPORT_NTFY_PUBLIC_URL:-}
       SUPPORT_TELEGRAM_ENABLED: ${SUPPORT_TELEGRAM_ENABLED:-false}
       SUPPORT_TELEGRAM_BOT_TOKEN: ${SUPPORT_TELEGRAM_BOT_TOKEN:-}
       SUPPORT_TELEGRAM_CHAT_ID: ${SUPPORT_TELEGRAM_CHAT_ID:-}
@@ -191,5 +192,33 @@ services:
     depends_on:
       web:
         condition: service_healthy
+
+  ntfy:
+    # Avisos push de soporte autoalojados (Plan.md §11.3, ADR ntfy).
+    #
+    # La API publica en el tema y el equipo de plataforma se suscribe con la
+    # app ntfy (o el navegador). El servidor solo es alcanzable por la red
+    # interna de Docker y por loopback en el host (§16.2, §18.2): para que un
+    # móvil externo reciba avisos hace falta exposición pública explícita,
+    # que NO se configura aquí.
+    image: binwiederhier/ntfy:latest
+    restart: unless-stopped
+    command: serve
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "--spider",
+          "http://localhost:80/v1/health",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      # Solo loopback: consultar/depurar el tema desde el host.
+      - "${NTFY_PORT:-127.0.0.1:8178}:80"
 volumes:
   pgdata:

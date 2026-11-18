@@ -89,9 +89,22 @@ def client(db_session: Session, monkeypatch: pytest.MonkeyPatch) -> Iterator[Tes
             {"recipient": recipient, "subject": subject, "text": text, "action_url": action_url}
         )
 
-    def capture_ntfy(settings: Settings, title: str, message: str, click_url: str) -> None:
+    def capture_ntfy(
+        settings: Settings,
+        title: str,
+        message: str,
+        click_url: str,
+        topic: str | None = None,
+    ) -> None:
         NOTIFY_OUTBOX.append(
-            {"channel": "ntfy", "title": title, "message": message, "click_url": click_url}
+            {
+                # Tema propio del comercio: el canal es el aviso push B2B.
+                "channel": "ntfy_merchant" if topic else "ntfy",
+                "topic": topic or "",
+                "title": title,
+                "message": message,
+                "click_url": click_url,
+            }
         )
 
     def capture_telegram(settings: Settings, text: str) -> None:

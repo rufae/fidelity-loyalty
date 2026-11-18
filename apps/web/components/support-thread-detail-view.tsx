@@ -76,6 +76,22 @@ export function SupportThreadDetailView({
 
   useEffect(() => load(), [load]);
 
+  // Conversación viva: si soporte responde, aparece sin recargar. Sondeo
+  // discreto solo con pestaña visible (mismo patrón que la tarjeta web).
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 20_000);
+    const onVisibility = (): void => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [load]);
+
   async function sendReply(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);

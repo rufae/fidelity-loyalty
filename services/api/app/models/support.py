@@ -73,9 +73,12 @@ class SupportNotificationChannel:
     EMAIL_PLATFORM = "email_platform"
     EMAIL_MERCHANT = "email_merchant"
     NTFY = "ntfy"
+    #: Aviso push al **comercio** (respuesta de plataforma): tema propio por
+    # comercio, generado con aleatoriedad (el tema actúa de credencial).
+    NTFY_MERCHANT = "ntfy_merchant"
     TELEGRAM = "telegram"
 
-    ALL = {EMAIL_PLATFORM, EMAIL_MERCHANT, NTFY, TELEGRAM}
+    ALL = {EMAIL_PLATFORM, EMAIL_MERCHANT, NTFY, NTFY_MERCHANT, TELEGRAM}
 
 
 class SupportNotificationStatus:

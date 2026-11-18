@@ -91,6 +91,11 @@ class Settings(BaseSettings):
     support_ntfy_base_url: str | None = None
     support_ntfy_topic: str | None = None
     support_ntfy_token: str | None = None
+    #: URL del servidor ntfy **publicada** para que los comercios se
+    #: suscriban desde su móvil. Si falta, los avisos al comercio solo son
+    #: entregables desde la red interna (§18.2: la exposición se decide
+    #: explícitamente).
+    support_ntfy_public_url: str | None = None
     support_telegram_enabled: bool = False
     support_telegram_bot_token: str | None = None
     support_telegram_chat_id: str | None = None

@@ -27,17 +27,39 @@ def _delivery_error() -> DomainError:
     )
 
 
-def send_ntfy(settings: Settings, title: str, message: str, click_url: str) -> None:
-    """Publica en un tema ntfy autoalojado; falla sin exponer URL ni token."""
+def send_ntfy(
+    settings: Settings,
+    title: str,
+    message: str,
+    click_url: str,
+    topic: str | None = None,
+) -> None:
+    """Publica en un tema ntfy autoalojado; falla sin exponer URL ni token.
+
+    El tema por omisión es el de la plataforma (`SUPPORT_NTFY_TOPIC`); los
+    avisos al comercio llevan su tema propio.
+    """
     if not settings.support_ntfy_enabled:
         raise DomainError(
             503,
             "notification_not_configured",
             "El aviso ntfy no está configurado.",
         )
-    assert settings.support_ntfy_base_url and settings.support_ntfy_topic
-    topic = quote(settings.support_ntfy_topic, safe="")
-    url = f"{settings.support_ntfy_base_url.rstrip('/')}/{topic}"
+    resolved_topic = topic or settings.support_ntfy_topic
+    if not resolved_topic:
+        raise DomainError(
+            503,
+            "notification_not_configured",
+            "Falta el tema de avisos.",
+        )
+    if not settings.support_ntfy_base_url:
+        raise DomainError(
+            503,
+            "notification_not_configured",
+            "Falta la URL del servidor de avisos.",
+        )
+    quoted_topic = quote(resolved_topic, safe="")
+    url = f"{settings.support_ntfy_base_url.rstrip('/')}/{quoted_topic}"
     headers = {
         "Title": title.encode("utf-8").decode("latin-1", errors="replace"),
         "Priority": "high",

@@ -17,6 +17,7 @@ import {
   StatusPill,
 } from "@/components/ui";
 import { ApiError } from "@/lib/api";
+import { useMerchant } from "@/components/merchant-context";
 import {
   support,
   supportStatusTone,
@@ -30,6 +31,8 @@ import { formatDateTime } from "@/lib/ui";
 export function SupportInboxView({ merchantId }: { merchantId: string }) {
   const [page, setPage] = useState<SupportThreadPage | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const { role, isPlatformAdmin: platformAdmin } = useMerchant();
+  const canManage = platformAdmin || (role === "owner" || role === "admin");
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -100,6 +103,11 @@ export function SupportInboxView({ merchantId }: { merchantId: string }) {
         )}
       </div>
 
+      {/* Avisos push (Plan.md §11.3): tema ntfy propio del comercio para
+          enterarse en el móvil cuando la plataforma responde. Solo
+          administración del comercio; el personal no lo necesita. */}
+      {canManage && <SupportPushSettings merchantId={merchantId} />}
+
       {page.items.length === 0 ? (
         <EmptyState
           illustration="card"
@@ -156,5 +164,87 @@ export function SupportInboxView({ merchantId }: { merchantId: string }) {
         </p>
       </div>
     </div>
+  );
+}
+
+/** Avisos push del comercio (§11.3): tema ntfy propio + cómo suscribirse.
+
+    El tema actúa de credencial: cada comercio tiene el suyo, generado con
+    aleatoriedad, y solo puede consultarlo la administración. Si el servidor
+    de avisos no está publicado, la interfaz lo dice sin prometer. */
+function SupportPushSettings({ merchantId }: { merchantId: string }) {
+  const [topic, setTopic] = useState<string | null>(null);
+  const [serverUrl, setServerUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    void support
+      .notificationTopic(merchantId)
+      .then((data) => {
+        setTopic(data.topic);
+        setServerUrl(data.server_url);
+      })
+      .catch((err) => {
+        setError(err instanceof ApiError ? err.message : "No se pudo consultar el tema de avisos.");
+      })
+      .finally(() => setLoading(false));
+  }, [merchantId]);
+
+  return (
+    <details
+      className="group rounded-2xl border border-line bg-surface shadow-soft"
+      onToggle={(event) => {
+        const open = (event.currentTarget as HTMLDetailsElement).open;
+        if (open && topic === null && !loading && error === null) load();
+      }}
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-ink-soft">
+            <IconMail size={16} />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-ink">Avisos en el móvil</span>
+            <span className="block text-xs text-ink-faint">
+              Recibe un aviso cuando la plataforma responde a una conversación
+            </span>
+          </span>
+        </span>
+        <span className="text-xs font-semibold text-brand group-open:hidden">Ver cómo</span>
+        <span className="hidden text-xs font-semibold text-ink-faint group-open:inline">
+          Cerrar
+        </span>
+      </summary>
+      <div className="border-t border-line px-5 py-4">
+        {loading && <p className="text-xs text-ink-faint">Consultando…</p>}
+        {error && <p className="text-xs text-danger">{error}</p>}
+        {topic && !loading && (
+          <div className="space-y-2.5">
+            <ol className="list-decimal space-y-1.5 pl-4 text-xs leading-relaxed text-ink-soft">
+              <li>
+                Instala la app ntfy (ntfy.sh) en tu móvil.
+              </li>
+              <li>
+                Añade una suscripción al tema{" "}
+                <code className="tnum rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-ink">
+                  {topic}
+                </code>
+                {serverUrl ? ` en el servidor ${serverUrl}` : ""}.
+              </li>
+              <li>Cada respuesta del soporte te llegará como un aviso con enlace a la conversación.</li>
+            </ol>
+            {!serverUrl && (
+              <p className="rounded-xl border border-warn/30 bg-gold-soft px-3 py-2 text-[11px] leading-relaxed text-warn">
+                El servidor de avisos aún no está publicado en Internet: de momento los avisos solo
+                funcionan desde la red del establecimiento. Pídenos la activación cuando la quieras.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </details>
   );
 }

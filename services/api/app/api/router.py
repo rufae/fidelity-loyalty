@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.api import (
     auth,
+    branding,
     dashboard,
     go,
     loyalty,
@@ -31,6 +32,7 @@ api_router.include_router(nfc.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(support.merchant_router)
 api_router.include_router(support.platform_router)
+api_router.include_router(branding.router)
 api_router.include_router(passkit.router)
 
 

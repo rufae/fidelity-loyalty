@@ -400,6 +400,88 @@ def test_fallo_de_aviso_no_pierde_la_conversacion_y_se_reintenta(
     assert retried.json()["status"] == "succeeded"
 
 
+def test_respuesta_plataforma_encola_aviso_push_con_tema_propio(
+    support_client: TestClient, db_session: Session
+) -> None:
+    """Plan.md §11.3: el push al comercio usa SU tema, aleatorio y único."""
+    from app.models.merchant import Merchant
+
+    merchant_a, _ = _world(db_session)
+    login(support_client, OWNER_A)
+    thread = _create_thread(support_client, merchant_a)
+
+    login(support_client, PLATFORM_EMAIL)
+    reply = support_client.post(
+        f"/api/v1/platform/support/threads/{thread['id']}/messages",
+        json={"body": "Respuesta con aviso push."},
+    )
+    assert reply.status_code == 201
+
+    notification = db_session.scalar(
+        select(SupportNotification).where(SupportNotification.channel == "ntfy_merchant")
+    )
+    assert notification is not None
+    # El tema se genera en la misma transacción que el evento (§6.3).
+    merchant = db_session.get(Merchant, merchant_a)
+    assert merchant is not None
+    assert merchant.support_ntfy_topic is not None
+    assert merchant.support_ntfy_topic.startswith("s-")
+
+
+def test_aviso_push_del_comercio_se_entrega_con_su_tema(
+    support_client: TestClient, db_session: Session, support_settings: Settings
+) -> None:
+    merchant_a, _ = _world(db_session)
+    login(support_client, OWNER_A)
+    thread = _create_thread(support_client, merchant_a)
+
+    login(support_client, PLATFORM_EMAIL)
+    support_client.post(
+        f"/api/v1/platform/support/threads/{thread['id']}/messages",
+        json={"body": "Entrega del push."},
+    )
+    NOTIFY_OUTBOX.clear()
+    processed = run_due_notifications(db_session, support_settings)
+    assert processed >= 1
+
+    entregas = [row for row in NOTIFY_OUTBOX if row["channel"] == "ntfy_merchant"]
+    assert len(entregas) == 1
+    from app.models.merchant import Merchant
+
+    merchant = db_session.get(Merchant, merchant_a)
+    assert merchant is not None and merchant.support_ntfy_topic is not None
+    assert entregas[0]["topic"] == merchant.support_ntfy_topic
+    assert "conversación" in entregas[0]["title"].lower() or "Soporte" in entregas[0]["title"]
+
+
+def test_tema_de_avisos_solo_para_administracion_y_estable(
+    support_client: TestClient, db_session: Session
+) -> None:
+    """Solo owner/admin consulta el tema; staff queda fuera (§8.1)."""
+    merchant_a, merchant_b = _world(db_session)
+
+    login(support_client, STAFF_A)
+    staff = support_client.get(f"/api/v1/merchants/{merchant_a}/support/notification-topic")
+    assert staff.status_code == 404
+
+    login(support_client, OWNER_A)
+    first = support_client.get(f"/api/v1/merchants/{merchant_a}/support/notification-topic")
+    assert first.status_code == 200
+    topic = first.json()["topic"]
+    assert topic.startswith("s-")
+    # Sin URL pública configurada: la interfaz lo dice, no se inventa (§17.2).
+    assert first.json()["server_url"] is None
+    # Estable: segunda consulta devuelve el mismo tema.
+    second = support_client.get(f"/api/v1/merchants/{merchant_a}/support/notification-topic")
+    assert second.json()["topic"] == topic
+
+    # Comercios distintos: temas distintos (el tema es la credencial).
+    login(support_client, OWNER_B)
+    other = support_client.get(f"/api/v1/merchants/{merchant_b}/support/notification-topic")
+    assert other.status_code == 200
+    assert other.json()["topic"] != topic
+
+
 def test_un_fallo_permanente_no_reintenta_infinitamente(
     support_client: TestClient,
     db_session: Session,

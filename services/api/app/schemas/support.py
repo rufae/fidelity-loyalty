@@ -141,3 +141,15 @@ class SupportThreadPageOut(BaseModel):
 
 class SupportUnreadOut(BaseModel):
     count: int
+
+
+class SupportNotificationTopicOut(BaseModel):
+    """Tema ntfy del comercio (avisos push de soporte, Plan.md §11.3).
+
+    `server_url` solo se entrega si el servidor está **publicado**
+    (`SUPPORT_NTFY_PUBLIC_URL`): sin él, el comercio no puede suscribirse
+    desde su móvil y la interfaz lo dice sin prometer.
+    """
+
+    topic: str
+    server_url: str | None = None

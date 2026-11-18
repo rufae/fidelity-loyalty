@@ -12,6 +12,7 @@ Reglas:
 """
 
 import logging
+import secrets
 import uuid
 from collections.abc import Callable
 from datetime import timedelta
@@ -60,6 +61,23 @@ def _merchant_name(session: Session, merchant_id: uuid.UUID) -> str:
     return merchant.name if merchant else "Comercio"
 
 
+def ensure_merchant_topic(session: Session, merchant: Merchant) -> str:
+    """Tema ntfy del comercio: lo crea si aún no tiene y lo devuelve.
+
+    Aleatorio y único (§6.3): en ntfy el nombre del tema es la credencial de
+    suscripción, así que no se deriva del slug ni de datos del comercio.
+    """
+    if merchant.support_ntfy_topic is not None:
+        return merchant.support_ntfy_topic
+    for _ in range(5):
+        topic = f"s-{secrets.token_hex(8)}"
+        existing = session.scalar(select(Merchant).where(Merchant.support_ntfy_topic == topic))
+        if existing is None:
+            merchant.support_ntfy_topic = topic
+            return topic
+    raise DomainError(500, "topic_generation_failed", "No se pudo generar el tema de avisos.")
+
+
 def _thread_url(settings: Settings, thread: SupportThread, *, platform: bool) -> str:
     path = (
         f"/platform/support/{thread.id}"
@@ -79,6 +97,10 @@ def _enabled_channels(
     if event == "platform_message":
         if settings.support_email_enabled and merchant_recipient:
             channels.append(SupportNotificationChannel.EMAIL_MERCHANT)
+        # Aviso push al comercio (tema propio): solo si el canal general
+        # está activo; el tema se genera al encolar si aún no existe.
+        if settings.support_ntfy_enabled:
+            channels.append(SupportNotificationChannel.NTFY_MERCHANT)
         return channels
     if settings.support_email_enabled and settings.support_notification_email:
         channels.append(SupportNotificationChannel.EMAIL_PLATFORM)
@@ -109,6 +131,13 @@ def queue_notifications(
     )
     rows: list[SupportNotification] = []
     for channel in _enabled_channels(settings, event=event, merchant_recipient=merchant_recipient):
+        # Tema ntfy del comercio: se genera al primer uso, en la misma
+        # transacción que el evento (aleatorio: es la credencial de
+        # suscripción, §6.3).
+        if channel == SupportNotificationChannel.NTFY_MERCHANT:
+            merchant = session.get(Merchant, thread.merchant_id)
+            if merchant is not None:
+                ensure_merchant_topic(session, merchant)
         idempotency_key = f"support:{event}:{source_id}:{channel}"
         existing = session.scalar(
             select(SupportNotification).where(
@@ -154,7 +183,10 @@ def _notification_text(
             "Nueva actividad en la conversación.",
             _thread_url(settings, thread, platform=True),
         )
-    if notification.channel == SupportNotificationChannel.EMAIL_MERCHANT:
+    if notification.channel in (
+        SupportNotificationChannel.EMAIL_MERCHANT,
+        SupportNotificationChannel.NTFY_MERCHANT,
+    ):
         subject = f"[Soporte] Nueva respuesta en «{thread.subject}»"
         text = (
             "El equipo de LocalAI Fidelity ha respondido en tu conversación: "
@@ -204,6 +236,19 @@ def _dispatch(
         from app.integrations import notify
 
         notify.send_ntfy(settings, subject, text, action_url)
+        return
+    if notification.channel == SupportNotificationChannel.NTFY_MERCHANT:
+        from app.integrations import notify
+
+        merchant = session.get(Merchant, thread.merchant_id)
+        topic = merchant.support_ntfy_topic if merchant else None
+        if not topic:
+            raise DomainError(
+                503,
+                "notification_not_configured",
+                "El comercio no tiene tema de avisos asignado.",
+            )
+        notify.send_ntfy(settings, subject, text, action_url, topic=topic)
         return
     if notification.channel == SupportNotificationChannel.TELEGRAM:
         from app.integrations import notify
