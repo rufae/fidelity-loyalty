@@ -45,3 +45,16 @@ apps/web/playwright-report/
 /docs/reference/
 /docs/PRODUCTION_GAP_ANALYSIS.md
 /docs/PRODUCTION_IMPLEMENTATION_PLAN.md
+
+# Blindaje extra (auditoria pre-publica 2026-11-23)
+*.pem
+*.key
+*.crt
+*.log
+*.dump
+*.sql
+*.sqlite
+*.sqlite3
+data/
+docker-compose.override.yml
+.envrc
